@@ -1,12 +1,11 @@
 import streamlit as st
 
-# ----- 기존 공룡 카드 (위에 있는 코드) -----
+# ----- 기존 공룡 카드 -----
 st.markdown("""
     <style>
     body, .stApp { background-color: #111 !important; color: #fff !important; }
     .dino-card { display: flex; align-items: center; background: rgba(20,20,20,0.98); border-radius: 1.5em; margin-bottom: 2.5em; box-shadow: 0 4px 24px #0008; transition: box-shadow 0.3s; padding: 2em 1em; opacity: 0; animation: fadeInUp 1.2s ease-out forwards;}
-    .dino-img { width: 260px; height: 160px; object-fit: cover; border-radius: 1em; box-shadow: 0 0 32px #7ef9ff22; margin-right: 2em; transition: transform 0.35s cubic-bezier(.33,2,.22,.8), box-shadow 0.3s; cursor: pointer;}
-    .dino-img:hover { transform: scale(1.13) rotate(-2deg); box-shadow: 0 0 64px #00fff9cc, 0 0 32px #fffb; z-index: 2;}
+    .dino-img { width: 260px; height: 160px; object-fit: cover; border-radius: 1em; box-shadow: 0 0 32px #7ef9ff22; margin-right: 2em; transition: none; cursor: pointer;}
     .dino-title { font-size: 2.1em; font-weight: bold; margin-bottom: 0.6em; color: #fff; text-shadow: 0 0 16px #fff7, 0 0 24px #00fff933; letter-spacing: 1.5px;}
     .dino-desc { font-size: 1.12em; color: #fff; text-shadow: 0 0 7px #00fff944;}
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(80px) scale(0.97);} to { opacity: 1; transform: none;}}
@@ -20,7 +19,7 @@ dino_data = [
         "desc": "티라노사우루스(Tyrannosaurus)는 백악기 후기에 북아메리카에서 살았던 육식공룡의 왕. 길이 약 12m, 키 4m, 무게 6~9톤. 압도적인 턱 힘과 사냥 실력으로 악명이 높았다."
     },
     {
-        "name": "알로사우르스",
+        "name": "알로사우루스",
         "img": "https://tse1.mm.bing.net/th/id/OIP.jNBXbE7eq0QdKu0uGOrr-AHaEr?rs=1&pid=ImgDetMain&o=7&rm=3",
         "desc": "알로사우루스(Allosaurus)는 쥐라기 후기의 포식자로, 약 8.5m 길이에 재빠른 움직임이 특징. 당시 '톱 포식자' 중 하나로 평가받았다."
     },
@@ -87,34 +86,11 @@ st.markdown("""
         box-shadow: 0 0 48px #ffe47822;
         margin: 0 10px;
         cursor: pointer;
-        transition: transform 0.35s cubic-bezier(.33,2,.22,.8), box-shadow 0.3s;
-    }
-    .ele-img:hover { transform: scale(1.12) rotate(3deg); box-shadow: 0 0 64px #ffee75cc, 0 0 32px #fff8; z-index:2;}
-    /* 똥 투척용 애니메이션 준비 */
-    .poop-img {
-        position: fixed;
-        left: 50%; top: 49%;
-        width: 90px; z-index: 1002;
-        opacity: 0;
-        pointer-events: none;
-        transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
-        transition: opacity 0.5s, transform 1s cubic-bezier(.28,2,.65,.9);
-    }
-    .poop-fly {
-        opacity: 1 !important;
-        animation: poopFly 1.1s cubic-bezier(.45,1.7,.58,.8) forwards;
-    }
-    @keyframes poopFly {
-        0%   { opacity:1; transform: translate(-50%,-50%) scale(0.3) rotate(0deg);}
-        60%  { opacity:1; }
-        85%  { opacity:1; }
-        100% { opacity:0; 
-            transform: translate(220px,160px) scale(0.9) rotate(370deg);}
+        transition: none;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# battle 설명
 st.markdown(f"""
     <div class="battle-card">
         <div class="battle-title">🐘 코끼리 vs 티라노 🦖</div>
@@ -128,36 +104,32 @@ st.markdown(f"""
             <img src="https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg"
                  id="ele-img"
                  class="ele-img"
-                 title="클릭하면… 코끼리 변신!"/>
+                 title="클릭하면… 춤추는 코끼리!"/>
         </div>
     </div>
-    <img src="https://img.freepik.com/premium-vector/cute-smiling-poop-character-happy-poo-emoji-isolated-on-white-background-vector-illustration_107547-1254.jpg?w=740"
-         id="poop-img"
-         class="poop-img"
-    />
 """, unsafe_allow_html=True)
 
-# --- JS: 클릭 시 이미지 바뀌고, 똥 애니메이션 ---
-
+# ---- JS for 코끼리 춤 ----
+# 좌우반전 5번 (0.1초마다), 이후 정상 이미지로 복귀!
 st.markdown("""
     <script>
-    let eleImg = window.parent.document.getElementById("ele-img");
-    let poop = window.parent.document.getElementById("poop-img");
-    if(eleImg && poop) {
-        eleImg.onclick = function(){
-            // 1. 코끼리2로 바꿈
-            let orig = "https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg";
-            let rear = "https://c.pxhere.com/images/1a/37/e8e2a84f85469d24299d6f795fae-1422613.jpg!d";
-            eleImg.src = rear;
-            // 2. 똥 날리기
-            poop.classList.add('poop-fly');
-            setTimeout(()=>{
-                poop.classList.remove('poop-fly');
-            }, 1100);
-            // 3. 다시 앞으로 (0.3초)
-            setTimeout(()=>{
-                eleImg.src = orig;
-            }, 300);
+    const eleImg = window.parent.document.getElementById("ele-img");
+    if(eleImg){
+        eleImg.onclick = async function(){
+            let normal = "https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg";
+            let dance = "https://c.pxhere.com/images/1a/37/e8e2a84f85469d24299d6f795fae-1422613.jpg!d";
+            eleImg.src = dance;
+            eleImg.style.transform = "scaleX(1)";
+            let flip = 1;
+            for(let i=0; i<5; i++){
+                await new Promise(r=>setTimeout(r,100));
+                flip *= -1;
+                eleImg.style.transform = "scaleX(" + flip + ")";
+            }
+            // 마지막에 원래대로
+            await new Promise(r=>setTimeout(r,100));
+            eleImg.src = normal;
+            eleImg.style.transform = "scaleX(1)";
         }
     }
     </script>
