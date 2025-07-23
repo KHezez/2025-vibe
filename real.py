@@ -1,7 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("볼풀: 싸움 모드 (약점-강점 일직선/HP숫자) by fury X monday")
+import time
+st.title("볼풀")
 
 if "nogravity" not in st.session_state:
     st.session_state.nogravity = False
@@ -58,6 +59,9 @@ html_code = f"""
       let dragIndex = -1;
       let offsetX = 0, offsetY = 0;
 
+      // 무적 쿨타임(ms)
+      const INVULN_TIME = 500;
+
       function randomColor() {{
         let r = Math.floor(120+Math.random()*135);
         let g = Math.floor(120+Math.random()*135);
@@ -74,10 +78,11 @@ html_code = f"""
             r: 32,
             m: 1,
             color: [r,g,b,a],
-            angle: random(0, TWO_PI),    // 각도(라디안)
-            av: random(-0.05,0.05),      // 각속도
+            angle: random(0, TWO_PI),
+            av: random(-0.05,0.05),
             hp: 10,
-            alive: true
+            alive: true,
+            last_hit: -10000,   // 마지막 데미지 프레임(ms)
         }});
       }}
 
@@ -92,16 +97,16 @@ html_code = f"""
       function draw() {{
         background(245,245,255);
         gravity = {0 if nogravity else 1.0};
+        let now = millis();
 
-        // 공이 부족/많으면 조정
+        // 공 갯수 동기화
         while (balls.length < {balls_n}) addBall();
         while (balls.length > {balls_n}) balls.pop();
 
-        // 물리 연산
+        // 물리
         for(let i=0; i<balls.length; i++) {{
           let b = balls[i];
           if (!b.alive) continue;
-
           if (!dragging || dragIndex !== i) {{
             b.vy += gravity * 0.25;
             b.x += b.vx;
@@ -111,8 +116,6 @@ html_code = f"""
             if (b.angle < 0) b.angle += TWO_PI;
             b.av *= 0.995;
           }}
-
-          // 벽 충돌
           let hitWall = false;
           if(b.x < b.r) {{ b.x = b.r; b.vx *= -0.85; hitWall = true; }}
           if(b.x > width - b.r) {{ b.x = width - b.r; b.vx *= -0.85; hitWall = true; }}
@@ -121,7 +124,6 @@ html_code = f"""
           if(hitWall && {str(fight_mode).lower()}) {{
             b.av += random(-0.15,0.15);
           }}
-
           if (dragging && dragIndex === i) {{
             b.x = mouseX + offsetX;
             b.y = mouseY + offsetY;
@@ -131,7 +133,7 @@ html_code = f"""
           }}
         }}
 
-        // ======= 충돌 및 싸움모드 =======
+        // ==== 싸움모드 충돌 처리 ====
         for(let i=0; i<balls.length; i++) {{
           let b1 = balls[i];
           if (!b1.alive) continue;
@@ -166,10 +168,10 @@ html_code = f"""
               b1.av += random(-0.08,0.08);
               b2.av += random(-0.08,0.08);
 
-              // === 싸움 모드 ===
               if ({str(fight_mode).lower()}) {{
-                // 각도(부위) 판정
-                // 약점: 0~0.3*2PI (0도 중심)  | 공격: PI~PI+0.2*2PI (정확히 반대, 36도씩)
+                // === 판정 ===
+                // 약점: 0~0.8*2PI  | 강점: 0.8*2PI~2PI
+                // 강점이 상대 약점 때렸을 때만 데미지, 무적시X
                 let angle12 = atan2(b2.y-b1.y, b2.x-b1.x) - b1.angle;
                 if(angle12 < 0) angle12 += TWO_PI;
                 if(angle12 > TWO_PI) angle12 -= TWO_PI;
@@ -178,59 +180,71 @@ html_code = f"""
                 if(angle21 < 0) angle21 += TWO_PI;
                 if(angle21 > TWO_PI) angle21 -= TWO_PI;
 
-                // b1 공격(빨강) = PI~PI+0.2*2PI
-                let attack1 = (angle12 > PI && angle12 < PI+0.2*2*PI);
-                // b2 약점(파랑) = 0~0.3*2PI
-                let weak2 = (angle21 >= 0 && angle21 < 0.3*2*PI);
+                // b1 강점(빨강): 0.8*2PI~2PI
+                let atk1 = (angle12 > 0.8*2*PI && angle12 <= 2*PI);
+                // b2 약점(파랑): 0~0.8*2PI
+                let weak2 = (angle21 >= 0 && angle21 < 0.8*2*PI);
 
-                // b2 공격(빨강)
-                let attack2 = (angle21 > PI && angle21 < PI+0.2*2*PI);
-                // b1 약점(파랑)
-                let weak1 = (angle12 >= 0 && angle12 < 0.3*2*PI);
+                // b2 강점(빨강): 0.8*2PI~2PI
+                let atk2 = (angle21 > 0.8*2*PI && angle21 <= 2*PI);
+                // b1 약점(파랑): 0~0.8*2PI
+                let weak1 = (angle12 >= 0 && angle12 < 0.8*2*PI);
 
-                // 공격 → 약점
-                if (attack1 && weak2) {{
-                  b2.hp -= 1;
-                  b2.av += random(-0.25,0.25);
+                // b1이 b2 약점 때림 (b1 강점 ↔ b2 약점)
+                if (atk1 && weak2) {{
+                  if (now - b2.last_hit > {int(0.5*1000)}) {{
+                    b2.hp -= 1;
+                    b2.last_hit = now;
+                    b2.av += random(-0.25,0.25);
+                  }}
                 }}
-                if (attack2 && weak1) {{
-                  b1.hp -= 1;
-                  b1.av += random(-0.25,0.25);
+                // b2가 b1 약점 때림
+                if (atk2 && weak1) {{
+                  if (now - b1.last_hit > {int(0.5*1000)}) {{
+                    b1.hp -= 1;
+                    b1.last_hit = now;
+                    b1.av += random(-0.25,0.25);
+                  }}
                 }}
               }}
             }}
           }}
         }}
 
+        // HP 0이하 공 제거
         for(let i=0; i<balls.length; i++) {{
           let b = balls[i];
           if (!b.alive) continue;
           if (b.hp <= 0) b.alive = false;
         }}
 
-        // 공 그리기
+        // ======= 그리기 =======
         for(let i=0; i<balls.length; i++) {{
           let b = balls[i];
           if (!b.alive) continue;
-
+          let now = millis();
           push();
           translate(b.x, b.y);
           rotate(b.angle);
 
-          // 본체(색상)
-          fill(b.color[0], b.color[1], b.color[2], b.color[3]);
-          stroke(40,80,140,180);
+          // 무적일 때 불투명도 ↓
+          let invuln = (now - b.last_hit < {int(0.5*1000)});
+          let alpha = invuln ? 120 : 220;
+
+          // 본체
+          fill(b.color[0], b.color[1], b.color[2], alpha);
+          stroke(40,80,140,180*alpha/220);
           strokeWeight(3);
           ellipse(0, 0, b.r*2, b.r*2);
 
-          // 약점(파란색 호, 0~0.3*2PI)
+          // 약점(파란색) 0~0.8*2PI
           if ({str(fight_mode).lower()}) {{
             noStroke();
-            fill(40,80,255,220);
-            arc(0, 0, b.r*2, b.r*2, 0, 0.3*2*PI, PIE);
-            // 공격부위(빨간색 호, PI~PI+0.2*2PI)
-            fill(255,80,80,220);
-            arc(0, 0, b.r*2, b.r*2, PI, PI+0.2*2*PI, PIE);
+            fill(40,80,255,alpha);
+            arc(0,0,b.r*2,b.r*2,0,0.8*2*PI,PIE);
+            // 강점(빨간색) 0.8*2PI~2PI
+            fill(255,80,80,alpha);
+            arc(0,0,b.r*2,b.r*2,0.8*2*PI,2*PI,PIE);
           }}
 
           // 중앙 HP
