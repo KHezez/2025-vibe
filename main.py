@@ -127,6 +127,11 @@ dino_data = [
         "img": "https://media.istockphoto.com/id/488080143/ko/%EC%82%AC%EC%A7%84/pterosaur-pteranodon.jpg?s=612x612&w=0&k=20&c=GFTwvWIIIr0MJKQJlDWz789qHEbMzF0jYUp6xM7rCDc=",
         "desc": "프테라노돈은 백악기 후기에 살았던 날개폭이 최대 7미터인 대빵큰 익룡이다. 부리에 이빨이 없었지만 물고기를 콕 집어먹을수있었으며, 새의 근본적 조상인 파충류다."
     },
+    {
+        "name": "브라키오사우르스",
+        "img": "https://tse1.mm.bing.net/th/id/OIP.5VR9e-CdcU4ZgFnk2IZFCwAAAA?rs=1&pid=ImgDetMain&o=7&rm=3",
+        "desc": "대머리 기린ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ"
+    },
 ]
 
 st.markdown('<div style="text-align:center; font-size:3em; font-weight:bold; margin-bottom:0.7em; color:#fff; text-shadow:0 0 20px #00fff9, 0 0 60px #fff3;">🦖 공룡 사전</div>', unsafe_allow_html=True)
