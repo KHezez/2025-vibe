@@ -126,6 +126,180 @@ for idx, dino in enumerate(dino_data):
         </div>
     """, unsafe_allow_html=True)
 
+# --- 캔버스: 드래그/중력/충돌 ---
+st.markdown('<div style="text-align:center; font-size:2.3em; font-weight:bold; margin-bottom:0.7em; color:#fff; text-shadow:0 0 20px #00fff9, 0 0 60px #fff3;">🦖 Gravity Playground: 티라노 vs 코끼리</div>', unsafe_allow_html=True)
+
+st.components.v1.html("""
+<div style=\"display:flex; justify-content:center;\">
+<canvas id=\"playground\" width=\"650\" height=\"350\" style=\"background:#232629; border-radius:1.7em; box-shadow:0 0 32px #000a;\"></canvas>
+</div>
+<script>
+const canvas = document.getElementById('playground');
+const ctx = canvas.getContext('2d');
+
+// 공 정보
+const balls = [
+  {
+    name: '티라노',
+    img: 'https://static.turbosquid.com/Preview/001304/868/KG/Z.jpg',
+    x: 180, y: 100, r: 56,
+    vx: 0, vy: 0,
+    dragging: false, offsetX: 0, offsetY: 0,
+    mass: 8.0,
+    color: '#00ffc2'
+  },
+  {
+    name: '코끼리',
+    img: 'https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg',
+    x: 440, y: 130, r: 64,
+    vx: 0, vy: 0,
+    dragging: false, offsetX: 0, offsetY: 0,
+    mass: 7.5,
+    color: '#e1e100'
+  }
+];
+
+// 이미지 로딩
+for (const b of balls) {
+  const image = new window.Image();
+  image.src = b.img;
+  b._img = image;
+}
+
+const g = 0.25; // 달 중력 (지구 1/4)
+const friction = 0.99;
+const bounce = 0.82;
+
+// 드래그 변수
+let dragIdx = null;
+
+canvas.addEventListener('mousedown', function(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  for (let i=balls.length-1; i>=0; i--) { // 위에 떠 있는 게 먼저 잡힘
+    const b = balls[i];
+    const dist = Math.hypot(mx-b.x, my-b.y);
+    if (dist < b.r) {
+      dragIdx = i;
+      b.dragging = true;
+      b.offsetX = mx - b.x;
+      b.offsetY = my - b.y;
+      b.vx = 0; b.vy = 0;
+      break;
+    }
+  }
+});
+canvas.addEventListener('mousemove', function(e) {
+  if (dragIdx !== null) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const b = balls[dragIdx];
+    b.x = mx - b.offsetX;
+    b.y = my - b.offsetY;
+  }
+});
+canvas.addEventListener('mouseup', function(e) {
+  if (dragIdx !== null) {
+    balls[dragIdx].dragging = false;
+    dragIdx = null;
+  }
+});
+canvas.addEventListener('mouseleave', function(e) {
+  if (dragIdx !== null) {
+    balls[dragIdx].dragging = false;
+    dragIdx = null;
+  }
+});
+
+function update() {
+  for (const b of balls) {
+    if (!b.dragging) {
+      b.vy += g;
+      b.x += b.vx;
+      b.y += b.vy;
+      b.vx *= friction;
+      b.vy *= friction;
+      // 바닥, 천장, 벽 튕김
+      if (b.x-b.r < 0) { b.x = b.r; b.vx *= -bounce; }
+      if (b.x+b.r > canvas.width) { b.x = canvas.width-b.r; b.vx *= -bounce; }
+      if (b.y-b.r < 0) { b.y = b.r; b.vy *= -bounce; }
+      if (b.y+b.r > canvas.height) { b.y = canvas.height-b.r; b.vy *= -bounce; }
+    }
+  }
+  // 충돌 (반발력)
+  for (let i=0; i<balls.length; i++) {
+    for (let j=i+1; j<balls.length; j++) {
+      const a = balls[i], b = balls[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.hypot(dx,dy);
+      if (dist < a.r + b.r) {
+        // 간단 반발력
+        const angle = Math.atan2(dy, dx);
+        const overlap = a.r + b.r - dist;
+        const totalMass = a.mass + b.mass;
+        a.x -= Math.cos(angle) * overlap * (b.mass/totalMass);
+        a.y -= Math.sin(angle) * overlap * (b.mass/totalMass);
+        b.x += Math.cos(angle) * overlap * (a.mass/totalMass);
+        b.y += Math.sin(angle) * overlap * (a.mass/totalMass);
+
+        // 반사 속도
+        const nx = dx/dist, ny = dy/dist;
+        const p = 2 * (a.vx*nx + a.vy*ny - b.vx*nx - b.vy*ny) / (a.mass + b.mass);
+        a.vx = (a.vx - p*b.mass*nx) * bounce;
+        a.vy = (a.vy - p*b.mass*ny) * bounce;
+        b.vx = (b.vx + p*a.mass*nx) * bounce;
+        b.vy = (b.vy + p*a.mass*ny) * bounce;
+      }
+    }
+  }
+}
+
+function drawBall(b) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, 2*Math.PI, false);
+  ctx.closePath();
+  // glow effect
+  ctx.shadowColor = b.color;
+  ctx.shadowBlur = 36;
+  ctx.clip();
+
+  // 원형 이미지
+  ctx.drawImage(b._img, b.x-b.r, b.y-b.r, b.r*2, b.r*2);
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // 테두리
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, 2*Math.PI, false);
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 3;
+  ctx.globalAlpha = 0.8;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+}
+
+function animate() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  update();
+  for (const b of balls) drawBall(b);
+  // 라벨
+  ctx.font = "bold 1.15em sans-serif";
+  ctx.textAlign = "center";
+  ctx.shadowColor = "#222";
+  ctx.shadowBlur = 18;
+  for (const b of balls) {
+    ctx.fillStyle = "#fff";
+    ctx.fillText(b.name, b.x, b.y+b.r+22);
+  }
+  ctx.shadowBlur = 0;
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+""", height=420)
+
 # --- 코끼리 vs 티라노 ---
 st.markdown(f"""
     <div class="vs-card">
