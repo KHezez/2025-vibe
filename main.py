@@ -188,7 +188,7 @@ st.components.v1.html("""
 const canvas = document.getElementById('fight-canvas');
 const ctx = canvas.getContext('2d');
 const balls = [
-  {name:'티라노',img:'https://static.turbosquid.com/Preview/001304/868/KG/Z.jpg',x:70,y:90,r:26,vx:0,vy:0,mass:8,col:'#00ffc2',drag:false},
+  {name:'티라노',img:'https://static.turbosquid.com/Preview/001304/868/KG/Z.jpg',x:70,y:90,r:40,vx:0,vy:0,mass:8,col:'#00ffc2',drag:false},
   {name:'코끼리',img:'https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg',x:250,y:90,r:32,vx:0,vy:0,mass:7.5,col:'#e1e100',drag:false}
 ];
 balls.forEach(b=>{const im=new Image(); im.src=b.img; b.im=im;});
