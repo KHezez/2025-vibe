@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("볼풀: 강점끼리 폭발&튕김 by fury X monday")
+st.title("볼풀: 강점끼리 폭발+폭발음! by fury X monday")
 
 if "nogravity" not in st.session_state:
     st.session_state.nogravity = False
@@ -30,11 +30,13 @@ balls_n = st.session_state.balls_n
 fight_mode = st.session_state.fight_mode
 
 EXPLOSION_IMG = "https://png.pngtree.com/png-clipart/20190705/original/pngtree-fire-explosion-blast-flame-png-transparent-png-image_4199261.jpg"
+EXPLOSION_SOUND = "https://files.catbox.moe/wwyaov.mp3"
 
 html_code = f"""
 <html>
   <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/addons/p5.sound.min.js"></script>
     <style>
       html, body {{ margin:0; padding:0; overflow:hidden; }}
       #canvas-container {{ width: 100vw; height: 100vh; }}
@@ -61,11 +63,12 @@ html_code = f"""
       let offsetX = 0, offsetY = 0;
       const INVULN_TIME = 500;
       let explosions = [];
-      let explosionImg;
-      let explosionLoaded = false;
+      let explosionImg, explosionSound;
+      let explosionLoaded = false, soundLoaded = false;
 
       function preload() {{
         explosionImg = loadImage("{EXPLOSION_IMG}", ()=>{{ explosionLoaded=true; }});
+        explosionSound = loadSound("{EXPLOSION_SOUND}", ()=>{{ soundLoaded=true; }});
       }}
 
       function randomColor() {{
@@ -99,6 +102,7 @@ html_code = f"""
           addBall();
         }}
         explosions = [];
+        userStartAudio(); // 사운드 재생 첫 클릭 필요
       }}
 
       function draw() {{
@@ -209,7 +213,7 @@ html_code = f"""
                   }}
                 }}
 
-                // === 강점끼리 폭발 & 튕김 ===
+                // === 강점끼리 폭발+사운드+튕김 ===
                 if (atk1 && atk2) {{
                   // 폭발 생성: 두 공 사이 좌표
                   if (explosionLoaded) {{
@@ -217,8 +221,12 @@ html_code = f"""
                       x: (b1.x + b2.x)/2,
                       y: (b1.y + b2.y)/2,
                       start: now,
-                      size: (b1.r+b2.r)*2.5, // 적당히 크게
+                      size: (b1.r+b2.r)*2.5,
                     }});
+                  }}
+                  // 폭발 사운드
+                  if (soundLoaded) {{
+                    explosionSound.play();
                   }}
                   // 두 공 속도 5배 튕김
                   b1.vx *= 5;
