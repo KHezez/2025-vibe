@@ -1,7 +1,16 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("볼풀: 보스 강점 판정 FIX! (by fury X monday)")
+st.title("볼풀")
+
+st.markdown("""
+- 공을 드래그해서 움직이세요!
+- 싸움 모드: 파란 쪽이 약점, 빨간 쪽이 강점입니다.<br>
+  강점으로 약점을 때리면 데미지!  
+  빨간색끼리 맞으면 폭발+강하게 튕김.
+- 보스는 평소 무적이지만, 폭발하면 5초간 약점으로 변해요!
+""", unsafe_allow_html=True)
+
 
 if "nogravity" not in st.session_state:
     st.session_state.nogravity = False
