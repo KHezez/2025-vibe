@@ -1,8 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-import time
-st.title("볼풀")
+st.title("볼풀: 강점끼리 폭발&튕김 by fury X monday")
 
 if "nogravity" not in st.session_state:
     st.session_state.nogravity = False
@@ -29,6 +28,8 @@ with col4:
 nogravity = st.session_state.nogravity
 balls_n = st.session_state.balls_n
 fight_mode = st.session_state.fight_mode
+
+EXPLOSION_IMG = "https://png.pngtree.com/png-clipart/20190705/original/pngtree-fire-explosion-blast-flame-png-transparent-png-image_4199261.jpg"
 
 html_code = f"""
 <html>
@@ -58,9 +59,14 @@ html_code = f"""
       let dragging = false;
       let dragIndex = -1;
       let offsetX = 0, offsetY = 0;
-
-      // 무적 쿨타임(ms)
       const INVULN_TIME = 500;
+      let explosions = [];
+      let explosionImg;
+      let explosionLoaded = false;
+
+      function preload() {{
+        explosionImg = loadImage("{EXPLOSION_IMG}", ()=>{{ explosionLoaded=true; }});
+      }}
 
       function randomColor() {{
         let r = Math.floor(120+Math.random()*135);
@@ -82,7 +88,7 @@ html_code = f"""
             av: random(-0.05,0.05),
             hp: 10,
             alive: true,
-            last_hit: -10000,   // 마지막 데미지 프레임(ms)
+            last_hit: -10000,
         }});
       }}
 
@@ -92,6 +98,7 @@ html_code = f"""
         for(let i=0; i<{balls_n}; i++) {{
           addBall();
         }}
+        explosions = [];
       }}
 
       function draw() {{
@@ -99,7 +106,7 @@ html_code = f"""
         gravity = {0 if nogravity else 1.0};
         let now = millis();
 
-        // 공 갯수 동기화
+        // 공 동기화
         while (balls.length < {balls_n}) addBall();
         while (balls.length > {balls_n}) balls.pop();
 
@@ -133,7 +140,7 @@ html_code = f"""
           }}
         }}
 
-        // ==== 싸움모드 충돌 처리 ====
+        // ==== 충돌 ====
         for(let i=0; i<balls.length; i++) {{
           let b1 = balls[i];
           if (!b1.alive) continue;
@@ -169,7 +176,7 @@ html_code = f"""
               b2.av += random(-0.08,0.08);
 
               if ({str(fight_mode).lower()}) {{
-                // === 판정 ===
+                // === 싸움 모드 ===
                 // 약점: 0~0.8*2PI  | 강점: 0.8*2PI~2PI
                 // 강점이 상대 약점 때렸을 때만 데미지, 무적시X
                 let angle12 = atan2(b2.y-b1.y, b2.x-b1.x) - b1.angle;
@@ -180,17 +187,13 @@ html_code = f"""
                 if(angle21 < 0) angle21 += TWO_PI;
                 if(angle21 > TWO_PI) angle21 -= TWO_PI;
 
-                // b1 강점(빨강): 0.8*2PI~2PI
                 let atk1 = (angle12 > 0.8*2*PI && angle12 <= 2*PI);
-                // b2 약점(파랑): 0~0.8*2PI
                 let weak2 = (angle21 >= 0 && angle21 < 0.8*2*PI);
 
-                // b2 강점(빨강): 0.8*2PI~2PI
                 let atk2 = (angle21 > 0.8*2*PI && angle21 <= 2*PI);
-                // b1 약점(파랑): 0~0.8*2PI
                 let weak1 = (angle12 >= 0 && angle12 < 0.8*2*PI);
 
-                // b1이 b2 약점 때림 (b1 강점 ↔ b2 약점)
+                // 공격→약점
                 if (atk1 && weak2) {{
                   if (now - b2.last_hit > {int(0.5*1000)}) {{
                     b2.hp -= 1;
@@ -198,13 +201,30 @@ html_code = f"""
                     b2.av += random(-0.25,0.25);
                   }}
                 }}
-                // b2가 b1 약점 때림
                 if (atk2 && weak1) {{
                   if (now - b1.last_hit > {int(0.5*1000)}) {{
                     b1.hp -= 1;
                     b1.last_hit = now;
                     b1.av += random(-0.25,0.25);
                   }}
+                }}
+
+                // === 강점끼리 폭발 & 튕김 ===
+                if (atk1 && atk2) {{
+                  // 폭발 생성: 두 공 사이 좌표
+                  if (explosionLoaded) {{
+                    explosions.push({{
+                      x: (b1.x + b2.x)/2,
+                      y: (b1.y + b2.y)/2,
+                      start: now,
+                      size: (b1.r+b2.r)*2.5, // 적당히 크게
+                    }});
+                  }}
+                  // 두 공 속도 5배 튕김
+                  b1.vx *= 5;
+                  b1.vy *= 5;
+                  b2.vx *= 5;
+                  b2.vy *= 5;
                 }}
               }}
             }}
@@ -218,7 +238,24 @@ html_code = f"""
           if (b.hp <= 0) b.alive = false;
         }}
 
-        // ======= 그리기 =======
+        // ======= 폭발 그리기 (fade out) =======
+        let newExplosions = [];
+        for(let i=0; i<explosions.length; i++) {{
+          let e = explosions[i];
+          let t = now - e.start;
+          if (t < 500) {{
+            push();
+            let alpha = map(t,0,500,255,0);
+            tint(255, alpha);
+            imageMode(CENTER);
+            image(explosionImg, e.x, e.y, e.size, e.size);
+            pop();
+            newExplosions.push(e);
+          }}
+        }}
+        explosions = newExplosions;
+
+        // ======= 공 그리기 =======
         for(let i=0; i<balls.length; i++) {{
           let b = balls[i];
           if (!b.alive) continue;
@@ -227,7 +264,6 @@ html_code = f"""
           translate(b.x, b.y);
           rotate(b.angle);
 
-          // 무적일 때 불투명도 ↓
           let invuln = (now - b.last_hit < {int(0.5*1000)});
           let alpha = invuln ? 120 : 220;
 
@@ -237,12 +273,12 @@ html_code = f"""
           strokeWeight(3);
           ellipse(0, 0, b.r*2, b.r*2);
 
-          // 약점(파란색) 0~0.8*2PI
+          // 약점(파랑) 0~0.8*2PI
           if ({str(fight_mode).lower()}) {{
             noStroke();
             fill(40,80,255,alpha);
             arc(0,0,b.r*2,b.r*2,0,0.8*2*PI,PIE);
-            // 강점(빨간색) 0.8*2PI~2PI
+            // 강점(빨강) 0.8*2PI~2PI
             fill(255,80,80,alpha);
             arc(0,0,b.r*2,b.r*2,0.8*2*PI,2*PI,PIE);
           }}
