@@ -122,6 +122,11 @@ dino_data = [
         "img": "https://png.pngtree.com/thumb_back/fw800/background/20240410/pngtree-dinosaur-triceratops-in-the-dark-image_15652694.jpg",
         "desc": "공룡시대의 코뿔소. 티라노사우르스나 알로사우르스도 함부로 덤비기를 꺼려했던 파키케팔로사우르스의 상위호환급 전투력을 지닌 <피식자> 이다."
     },
+    {
+        "name": "프테라노돈",
+        "img": "https://media.istockphoto.com/id/488080143/ko/%EC%82%AC%EC%A7%84/pterosaur-pteranodon.jpg?s=612x612&w=0&k=20&c=GFTwvWIIIr0MJKQJlDWz789qHEbMzF0jYUp6xM7rCDc=",
+        "desc": "프테라노돈은 백악기 후기에 살았던 날개폭이 최대 7미터인 대빵큰 익룡이다. 부리에 이빨이 없었지만 물고기를 콕 집어먹을수있었으며, 새의 근본적 조상인 파충류다."
+    },
 ]
 
 st.markdown('<div style="text-align:center; font-size:3em; font-weight:bold; margin-bottom:0.7em; color:#fff; text-shadow:0 0 20px #00fff9, 0 0 60px #fff3;">🦖 공룡 사전</div>', unsafe_allow_html=True)
