@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("볼풀: 강점끼리 폭발+폭발음! by fury X monday")
+st.title("볼풀: 보스 등장! (by fury X monday)")
 
 if "nogravity" not in st.session_state:
     st.session_state.nogravity = False
@@ -9,8 +9,10 @@ if "balls_n" not in st.session_state:
     st.session_state.balls_n = 10
 if "fight_mode" not in st.session_state:
     st.session_state.fight_mode = False
+if "boss" not in st.session_state:
+    st.session_state.boss = False
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     if st.button("공 추가 (+1)"):
         st.session_state.balls_n += 1
@@ -24,13 +26,23 @@ with col3:
 with col4:
     if st.button("싸움 모드 ON/OFF"):
         st.session_state.fight_mode = not st.session_state.fight_mode
+with col5:
+    boss_btn = st.empty()
+    if not st.session_state.boss:
+        if boss_btn.button("보스 추가"):
+            st.session_state.boss = True
+    else:
+        if boss_btn.button("보스 삭제"):
+            st.session_state.boss = False
 
 nogravity = st.session_state.nogravity
 balls_n = st.session_state.balls_n
 fight_mode = st.session_state.fight_mode
+boss = st.session_state.boss
 
 EXPLOSION_IMG = "https://png.pngtree.com/png-clipart/20190705/original/pngtree-fire-explosion-blast-flame-png-transparent-png-image_4199261.jpg"
 EXPLOSION_SOUND = "https://files.catbox.moe/wwyaov.mp3"
+HIT_SOUND = "https://files.catbox.moe/pqw80a.mp3"
 
 html_code = f"""
 <html>
@@ -49,12 +61,18 @@ html_code = f"""
         background: #900; color: #fff; padding: 7px 16px; border-radius: 18px; font-size: 18px; opacity: 0.7;
         display: {'block' if fight_mode else 'none'};
       }}
+      .boss-indicator {{
+        position: absolute; top: 90px; left: 10px; z-index: 10;
+        background: #fb0; color: #000; padding: 7px 16px; border-radius: 18px; font-size: 18px; opacity: 0.7;
+        display: {'block' if boss else 'none'};
+      }}
     </style>
   </head>
   <body>
     <div id="canvas-container"></div>
     <div class="gravity-indicator" id="grav_ind">{'🛰️ 무중력 모드' if nogravity else '🌎 중력 ON'}</div>
     <div class="fight-indicator" id="fight_ind">⚔️ 싸움 모드</div>
+    <div class="boss-indicator" id="boss_ind">👹 보스 등장!</div>
     <script>
       let balls = [];
       let gravity = {0 if nogravity else 1.0};
@@ -63,12 +81,17 @@ html_code = f"""
       let offsetX = 0, offsetY = 0;
       const INVULN_TIME = 500;
       let explosions = [];
-      let explosionImg, explosionSound;
-      let explosionLoaded = false, soundLoaded = false;
+      let explosionImg, explosionSound, hitSound;
+      let explosionLoaded = false, soundLoaded = false, hitLoaded = false;
+      let bossIdx = -1;
+      let boss_stun = false;
+      let boss_stun_start = -10000;
+      const BOSS_STUN_TIME = 5000;
 
       function preload() {{
         explosionImg = loadImage("{EXPLOSION_IMG}", ()=>{{ explosionLoaded=true; }});
         explosionSound = loadSound("{EXPLOSION_SOUND}", ()=>{{ soundLoaded=true; }});
+        hitSound = loadSound("{HIT_SOUND}", ()=>{{ hitLoaded=true; }});
       }}
 
       function randomColor() {{
@@ -92,7 +115,32 @@ html_code = f"""
             hp: 10,
             alive: true,
             last_hit: -10000,
+            isBoss: false,
+            stun: false,
+            stunStart: -10000
         }});
+      }}
+
+      function addBoss() {{
+        // 보스는 r=54, m=8, hp=20, 중앙고정, 전체 빨강(강점), stun=true면 전체 파랑(약점)
+        balls.push({{
+            x: width*0.5, 
+            y: height*0.4, 
+            vx: random(-1.1,1.1), vy: random(-1.1,1.1), 
+            r: 54,
+            m: 8,
+            color: [220,100,60,230],
+            angle: random(0, TWO_PI),
+            av: random(-0.02,0.02),
+            hp: 20,
+            alive: true,
+            last_hit: -10000,
+            isBoss: true,
+            stun: false,
+            stunStart: -10000
+        }});
+        bossIdx = balls.length-1;
+        boss_stun = false;
       }}
 
       function setup() {{
@@ -101,8 +149,11 @@ html_code = f"""
         for(let i=0; i<{balls_n}; i++) {{
           addBall();
         }}
+        if ({str(boss).lower()}) {{
+            addBoss();
+        }}
         explosions = [];
-        userStartAudio(); // 사운드 재생 첫 클릭 필요
+        userStartAudio();
       }}
 
       function draw() {{
@@ -111,15 +162,41 @@ html_code = f"""
         let now = millis();
 
         // 공 동기화
-        while (balls.length < {balls_n}) addBall();
-        while (balls.length > {balls_n}) balls.pop();
+        while (balls.length < {balls_n} + ({'1' if boss else '0'}) ) {{
+            if ({str(boss).lower()} && !balls.some(b=>b.isBoss)) {{
+                addBoss();
+            }} else {{
+                addBall();
+            }}
+        }}
+        // 보스 삭제(플래그 off되면)
+        if (!{str(boss).lower()}) {{
+            for(let i=balls.length-1; i>=0; i--) {{
+                if(balls[i].isBoss) balls.splice(i,1);
+            }}
+            bossIdx = -1;
+            boss_stun = false;
+        }}
+
+        while (balls.length > {balls_n} + ({'1' if boss else '0'})) balls.pop();
 
         // 물리
         for(let i=0; i<balls.length; i++) {{
           let b = balls[i];
           if (!b.alive) continue;
+
+          // 보스 스턴 타임 체크
+          if (b.isBoss) {{
+              if(b.stun && now - b.stunStart > BOSS_STUN_TIME) {{
+                  b.stun = false;
+                  boss_stun = false;
+              }}
+          }}
+
+          // 무게별 반영
+          let m_fac = (b.isBoss?0.3:1.0); // 보스는 덜 밀림
           if (!dragging || dragIndex !== i) {{
-            b.vy += gravity * 0.25;
+            b.vy += gravity * 0.25 * m_fac;
             b.x += b.vx;
             b.y += b.vy;
             b.angle += b.av;
@@ -128,10 +205,10 @@ html_code = f"""
             b.av *= 0.995;
           }}
           let hitWall = false;
-          if(b.x < b.r) {{ b.x = b.r; b.vx *= -0.85; hitWall = true; }}
-          if(b.x > width - b.r) {{ b.x = width - b.r; b.vx *= -0.85; hitWall = true; }}
-          if(b.y < b.r) {{ b.y = b.r; b.vy *= -0.85; hitWall = true; }}
-          if(b.y > height - b.r) {{ b.y = height - b.r; b.vy *= -0.85; hitWall = true; }}
+          if(b.x < b.r) {{ b.x = b.r; b.vx *= -0.70; hitWall = true; }}
+          if(b.x > width - b.r) {{ b.x = width - b.r; b.vx *= -0.70; hitWall = true; }}
+          if(b.y < b.r) {{ b.y = b.r; b.vy *= -0.70; hitWall = true; }}
+          if(b.y > height - b.r) {{ b.y = height - b.r; b.vy *= -0.70; hitWall = true; }}
           if(hitWall && {str(fight_mode).lower()}) {{
             b.av += random(-0.15,0.15);
           }}
@@ -158,10 +235,13 @@ html_code = f"""
             if (dist2 < minDist*minDist) {{
               let dist = sqrt(dist2) || 0.01;
               let overlap = 0.5 * (dist - minDist);
-              b1.x += overlap * dx / dist;
-              b1.y += overlap * dy / dist;
-              b2.x -= overlap * dx / dist;
-              b2.y -= overlap * dy / dist;
+              // 무게비 반영
+              let m1 = b1.isBoss ? 8 : 1;
+              let m2 = b2.isBoss ? 8 : 1;
+              b1.x += overlap * dx / dist * (m2/(m1+m2));
+              b1.y += overlap * dy / dist * (m2/(m1+m2));
+              b2.x -= overlap * dx / dist * (m1/(m1+m2));
+              b2.y -= overlap * dy / dist * (m1/(m1+m2));
 
               // 탄성 충돌
               let nx = dx / dist, ny = dy / dist;
@@ -170,7 +250,8 @@ html_code = f"""
               let v1t = b1.vx*tx + b1.vy*ty;
               let v2n = b2.vx*nx + b2.vy*ny;
               let v2t = b2.vx*tx + b2.vy*ty;
-              let v1n_new = v2n, v2n_new = v1n;
+              let v1n_new = (v2n * m2 + v1n * (m1-m2)) / (m1+m2);
+              let v2n_new = (v1n * m1 + v2n * (m2-m1)) / (m1+m2);
               b1.vx = v1n_new*nx + v1t*tx;
               b1.vy = v1n_new*ny + v1t*ty;
               b2.vx = v2n_new*nx + v2t*tx;
@@ -180,9 +261,12 @@ html_code = f"""
               b2.av += random(-0.08,0.08);
 
               if ({str(fight_mode).lower()}) {{
-                // === 싸움 모드 ===
-                // 약점: 0~0.8*2PI  | 강점: 0.8*2PI~2PI
-                // 강점이 상대 약점 때렸을 때만 데미지, 무적시X
+                let now = millis();
+                // 일반공 약점(0~0.8*2PI), 강점(0.8*2PI~2PI)
+                // 보스 평소: 전체 강점(빨강), stun: 전체 약점(파랑)
+                let b1atk = !b1.isBoss && (b1.angle !== undefined);
+                let b2atk = !b2.isBoss && (b2.angle !== undefined);
+
                 let angle12 = atan2(b2.y-b1.y, b2.x-b1.x) - b1.angle;
                 if(angle12 < 0) angle12 += TWO_PI;
                 if(angle12 > TWO_PI) angle12 -= TWO_PI;
@@ -191,48 +275,84 @@ html_code = f"""
                 if(angle21 < 0) angle21 += TWO_PI;
                 if(angle21 > TWO_PI) angle21 -= TWO_PI;
 
-                let atk1 = (angle12 > 0.8*2*PI && angle12 <= 2*PI);
-                let weak2 = (angle21 >= 0 && angle21 < 0.8*2*PI);
+                // === 일반공-일반공 ===
+                if (!b1.isBoss && !b2.isBoss) {{
+                    let atk1 = (angle12 > 0.8*2*PI && angle12 <= 2*PI);
+                    let weak2 = (angle21 >= 0 && angle21 < 0.8*2*PI && !b2.stun);
+                    let atk2 = (angle21 > 0.8*2*PI && angle21 <= 2*PI);
+                    let weak1 = (angle12 >= 0 && angle12 < 0.8*2*PI && !b1.stun);
 
-                let atk2 = (angle21 > 0.8*2*PI && angle21 <= 2*PI);
-                let weak1 = (angle12 >= 0 && angle12 < 0.8*2*PI);
-
-                // 공격→약점
-                if (atk1 && weak2) {{
-                  if (now - b2.last_hit > {int(0.5*1000)}) {{
-                    b2.hp -= 1;
-                    b2.last_hit = now;
-                    b2.av += random(-0.25,0.25);
-                  }}
+                    // 정상 데미지
+                    if (atk1 && weak2) {{
+                        if (now - b2.last_hit > {int(0.5*1000)}) {{
+                            b2.hp -= 1;
+                            b2.last_hit = now;
+                            b2.av += random(-0.25,0.25);
+                            if (hitLoaded) hitSound.play();
+                        }}
+                    }}
+                    if (atk2 && weak1) {{
+                        if (now - b1.last_hit > {int(0.5*1000)}) {{
+                            b1.hp -= 1;
+                            b1.last_hit = now;
+                            b1.av += random(-0.25,0.25);
+                            if (hitLoaded) hitSound.play();
+                        }}
+                    }}
+                    // 강점끼리 폭발
+                    if (atk1 && atk2) {{
+                        if (explosionLoaded) {{
+                            explosions.push({{
+                              x: (b1.x + b2.x)/2,
+                              y: (b1.y + b2.y)/2,
+                              start: now,
+                              size: (b1.r+b2.r)*2.5,
+                            }});
+                        }}
+                        if (soundLoaded) explosionSound.play();
+                        b1.vx *= 5; b1.vy *= 5;
+                        b2.vx *= 5; b2.vy *= 5;
+                    }}
                 }}
-                if (atk2 && weak1) {{
-                  if (now - b1.last_hit > {int(0.5*1000)}) {{
-                    b1.hp -= 1;
-                    b1.last_hit = now;
-                    b1.av += random(-0.25,0.25);
-                  }}
-                }}
 
-                // === 강점끼리 폭발+사운드+튕김 ===
-                if (atk1 && atk2) {{
-                  // 폭발 생성: 두 공 사이 좌표
-                  if (explosionLoaded) {{
-                    explosions.push({{
-                      x: (b1.x + b2.x)/2,
-                      y: (b1.y + b2.y)/2,
-                      start: now,
-                      size: (b1.r+b2.r)*2.5,
-                    }});
-                  }}
-                  // 폭발 사운드
-                  if (soundLoaded) {{
-                    explosionSound.play();
-                  }}
-                  // 두 공 속도 5배 튕김
-                  b1.vx *= 5;
-                  b1.vy *= 5;
-                  b2.vx *= 5;
-                  b2.vy *= 5;
+                // === 일반공-보스 ===
+                if (b1.isBoss != b2.isBoss) {{
+                    let boss = b1.isBoss ? b1 : b2;
+                    let normal = b1.isBoss ? b2 : b1;
+                    let boss_angle = b1.isBoss ? angle21 : angle12;
+                    let norm_angle = b1.isBoss ? angle12 : angle21;
+
+                    // 보스 평소: 전체 강점
+                    // 일반공 강점 (0.8*2PI~2PI)
+                    let normalAttack = (norm_angle > 0.8*2*PI && norm_angle <= 2*PI);
+
+                    // === 일반공-보스 강점끼리 폭발: 보스 스턴 + 폭발+튕김 ===
+                    if (!boss.stun && normalAttack) {{
+                        if (explosionLoaded) {{
+                            explosions.push({{
+                              x: (boss.x + normal.x)/2,
+                              y: (boss.y + normal.y)/2,
+                              start: now,
+                              size: (boss.r+normal.r)*2.7,
+                            }});
+                        }}
+                        if (soundLoaded) explosionSound.play();
+                        boss.vx *= 2.5; boss.vy *= 2.5;
+                        normal.vx *= 5; normal.vy *= 5;
+                        boss.stun = true;
+                        boss.stunStart = now;
+                        // 약점 전체 오픈(5초간)
+                    }}
+
+                    // === 스턴 중 약점 때릴 때 데미지 & 효과음 ===
+                    if (boss.stun && normalAttack) {{
+                        if (now - boss.last_hit > {int(0.5*1000)}) {{
+                            boss.hp -= 1;
+                            boss.last_hit = now;
+                            boss.av += random(-0.18,0.18);
+                            if (hitLoaded) hitSound.play();
+                        }}
+                    }}
                 }}
               }}
             }}
@@ -281,21 +401,31 @@ html_code = f"""
           strokeWeight(3);
           ellipse(0, 0, b.r*2, b.r*2);
 
-          // 약점(파랑) 0~0.8*2PI
+          // 약점/강점
           if ({str(fight_mode).lower()}) {{
             noStroke();
-            fill(40,80,255,alpha);
-            arc(0,0,b.r*2,b.r*2,0,0.8*2*PI,PIE);
-            // 강점(빨강) 0.8*2PI~2PI
-            fill(255,80,80,alpha);
-            arc(0,0,b.r*2,b.r*2,0.8*2*PI,2*PI,PIE);
+            if (b.isBoss) {{
+                // 평소: 전체 빨강(강점), stun중: 전체 파랑(약점)
+                if (b.stun) {{
+                    fill(40,80,255,alpha);
+                }} else {{
+                    fill(255,80,80,alpha);
+                }}
+                arc(0,0,b.r*2,b.r*2,0,2*PI,PIE);
+            }} else {{
+                // 일반공: 약점(80%), 강점(20%)
+                fill(40,80,255,alpha);
+                arc(0,0,b.r*2,b.r*2,0,0.8*2*PI,PIE);
+                fill(255,80,80,alpha);
+                arc(0,0,b.r*2,b.r*2,0.8*2*PI,2*PI,PIE);
+            }}
           }}
 
           // 중앙 HP
           fill(32,32,32,240);
           noStroke();
           textAlign(CENTER, CENTER);
-          textSize(b.r*0.85);
+          textSize(b.r*0.8);
           text(b.hp, 0, 4);
           pop();
         }}
