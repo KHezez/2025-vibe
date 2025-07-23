@@ -87,9 +87,239 @@ st.markdown("""
         text-align: center;
         line-height: 1.7em;
     }
+    /* 오버레이 캔버스 위치 고정 (전체 화면 덮음) */
+    #gravity-overlay {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none; /* 기본값: 클릭 막음 */
+        z-index: 9001;
+    }
+    #gravity-overlay.active {
+        pointer-events: auto; /* 캔버스 위에서만 마우스 허용 */
+    }
     </style>
 """, unsafe_allow_html=True)
 
+# --- 캔버스 오버레이 (사이트 전체 덮는 방식) ---
+st.components.v1.html("""
+<canvas id='gravity-overlay' width='1280' height='720'></canvas>
+<script>
+// 오버레이 사이즈 동기화
+def resizeOverlay() {
+  const canvas = document.getElementById('gravity-overlay');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeOverlay);
+resizeOverlay();
+
+const canvas = document.getElementById('gravity-overlay');
+const ctx = canvas.getContext('2d');
+canvas.classList.add('active'); // 마우스 이벤트 허용
+
+// 공 정보
+document.balls = [
+  {
+    name: '티라노',
+    img: 'https://static.turbosquid.com/Preview/001304/868/KG/Z.jpg',
+    x: 280, y: 260, r: 72,
+    vx: 0, vy: 0,
+    dragging: false, dragStart: null, dragLast: null,
+    mass: 8.0,
+    color: '#00ffc2'
+  },
+  {
+    name: '코끼리',
+    img: 'https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg',
+    x: 700, y: 320, r: 84,
+    vx: 0, vy: 0,
+    dragging: false, dragStart: null, dragLast: null,
+    mass: 7.5,
+    color: '#e1e100'
+  }
+];
+
+for (const b of document.balls) {
+  const image = new window.Image();
+  image.src = b.img;
+  b._img = image;
+}
+
+const g = 0.25;
+const friction = 0.988;
+const bounce = 0.85;
+let earthquakeTimer = 0;
+
+// --- 마우스 드래그 & 속도 적용 ---
+let dragIdx = null;
+let lastMouse = null;
+canvas.addEventListener('mousedown', function(e) {
+  const mx = e.clientX, my = e.clientY;
+  for (let i=document.balls.length-1; i>=0; i--) {
+    const b = document.balls[i];
+    const dist = Math.hypot(mx-b.x, my-b.y);
+    if (dist < b.r) {
+      dragIdx = i;
+      b.dragging = true;
+      b.dragStart = {x: mx, y: my, time: Date.now()};
+      b.dragLast = {x: mx, y: my, time: Date.now()};
+      b.vx = 0; b.vy = 0;
+      lastMouse = {x: mx, y: my};
+      break;
+    }
+  }
+});
+canvas.addEventListener('mousemove', function(e) {
+  if (dragIdx !== null) {
+    const mx = e.clientX, my = e.clientY;
+    const b = document.balls[dragIdx];
+    b.x = mx;
+    b.y = my;
+    if (b.dragLast) b.dragLast = {x: mx, y: my, time: Date.now()};
+    lastMouse = {x: mx, y: my};
+  }
+});
+canvas.addEventListener('mouseup', function(e) {
+  if (dragIdx !== null) {
+    const b = document.balls[dragIdx];
+    // 마우스 속도(가속도) 반영
+    if (b.dragStart && b.dragLast && b.dragLast.time > b.dragStart.time) {
+      const dx = b.dragLast.x - b.dragStart.x;
+      const dy = b.dragLast.y - b.dragStart.y;
+      const dt = (b.dragLast.time - b.dragStart.time) / 1000.0 + 0.001;
+      b.vx = dx / dt * 0.06; // tuning 필요
+      b.vy = dy / dt * 0.06;
+    }
+    b.dragging = false;
+    dragIdx = null;
+    b.dragStart = null;
+    b.dragLast = null;
+  }
+});
+canvas.addEventListener('mouseleave', function(e) {
+  if (dragIdx !== null) {
+    const b = document.balls[dragIdx];
+    b.dragging = false;
+    dragIdx = null;
+    b.dragStart = null;
+    b.dragLast = null;
+  }
+});
+
+// --- 충돌 시 지진효과 ---
+function triggerEarthquake() {
+  if (earthquakeTimer <= 0) {
+    earthquakeTimer = 30; // 0.5초 (60fps 기준)
+  }
+}
+
+function update() {
+  for (const b of document.balls) {
+    if (!b.dragging) {
+      b.vy += g;
+      b.x += b.vx;
+      b.y += b.vy;
+      b.vx *= friction;
+      b.vy *= friction;
+      // 벽/바닥/천장 반사
+      if (b.x-b.r < 0) { b.x = b.r; b.vx *= -bounce; }
+      if (b.x+b.r > canvas.width) { b.x = canvas.width-b.r; b.vx *= -bounce; }
+      if (b.y-b.r < 0) { b.y = b.r; b.vy *= -bounce; }
+      if (b.y+b.r > canvas.height) { b.y = canvas.height-b.r; b.vy *= -bounce; }
+    }
+  }
+  // 충돌 체크
+  for (let i=0; i<document.balls.length; i++) {
+    for (let j=i+1; j<document.balls.length; j++) {
+      const a = document.balls[i], b = document.balls[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.hypot(dx,dy);
+      if (dist < a.r + b.r) {
+        // 오버랩 해소
+        const angle = Math.atan2(dy, dx);
+        const overlap = (a.r + b.r - dist) * 0.55;
+        const totalMass = a.mass + b.mass;
+        a.x -= Math.cos(angle) * overlap * (b.mass/totalMass);
+        a.y -= Math.sin(angle) * overlap * (b.mass/totalMass);
+        b.x += Math.cos(angle) * overlap * (a.mass/totalMass);
+        b.y += Math.sin(angle) * overlap * (a.mass/totalMass);
+        // 반사 속도(탄성 충돌)
+        const nx = dx/dist, ny = dy/dist;
+        const tx = -ny, ty = nx;
+        // 속도 분해
+        const va_n = a.vx*nx + a.vy*ny;
+        const vb_n = b.vx*nx + b.vy*ny;
+        const va_t = a.vx*tx + a.vy*ty;
+        const vb_t = b.vx*tx + b.vy*ty;
+        // new normal velocity (탄성 충돌 공식)
+        const va_n_new = (va_n * (a.mass-b.mass) + 2*b.mass*vb_n)/(a.mass+b.mass);
+        const vb_n_new = (vb_n * (b.mass-a.mass) + 2*a.mass*va_n)/(a.mass+b.mass);
+        // 다시 합성
+        a.vx = va_n_new*nx + va_t*tx;
+        a.vy = va_n_new*ny + va_t*ty;
+        b.vx = vb_n_new*nx + vb_t*tx;
+        b.vy = vb_n_new*ny + vb_t*ty;
+        // 튕김 튜닝
+        a.vx *= bounce; a.vy *= bounce;
+        b.vx *= bounce; b.vy *= bounce;
+        triggerEarthquake();
+      }
+    }
+  }
+}
+
+function drawBall(b) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, 2*Math.PI, false);
+  ctx.closePath();
+  // glow
+  ctx.shadowColor = b.color;
+  ctx.shadowBlur = 38;
+  ctx.clip();
+  ctx.drawImage(b._img, b.x-b.r, b.y-b.r, b.r*2, b.r*2);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+  // 테두리
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, 2*Math.PI, false);
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 3;
+  ctx.globalAlpha = 0.8;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+  // 이름
+  ctx.font = "bold 1.15em sans-serif";
+  ctx.textAlign = "center";
+  ctx.shadowColor = "#222";
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = "#fff";
+  ctx.fillText(b.name, b.x, b.y+b.r+25);
+  ctx.shadowBlur = 0;
+}
+
+function animate() {
+  if (!canvas) return;
+  // 화면 흔들림(지진효과)
+  if (earthquakeTimer > 0) {
+    const shake = Math.sin(Date.now()*0.12)*earthquakeTimer*1.2;
+    canvas.style.transform = `translate(${shake}px, ${-shake/2}px)`;
+    earthquakeTimer--;
+  } else {
+    canvas.style.transform = "";
+  }
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  update();
+  for (const b of document.balls) drawBall(b);
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+""", height=800)
+
+# --- 본문 카드/설명은 그대로 ---
 dino_data = [
     {
         "name": "티라노사우르스",
@@ -115,6 +345,8 @@ dino_data = [
 
 st.markdown('<div style="text-align:center; font-size:3em; font-weight:bold; margin-bottom:0.7em; color:#fff; text-shadow:0 0 20px #00fff9, 0 0 60px #fff3;">🦖 공룡 사전</div>', unsafe_allow_html=True)
 
+# ... (위까지는 네가 보낸 코드와 동일)
+
 for idx, dino in enumerate(dino_data):
     st.markdown(f"""
         <div class="dino-card" style="animation-delay: {idx * 0.3}s">
@@ -126,181 +358,7 @@ for idx, dino in enumerate(dino_data):
         </div>
     """, unsafe_allow_html=True)
 
-# --- 캔버스: 드래그/중력/충돌 ---
-st.markdown('<div style="text-align:center; font-size:2.3em; font-weight:bold; margin-bottom:0.7em; color:#fff; text-shadow:0 0 20px #00fff9, 0 0 60px #fff3;">🦖 Gravity Playground: 티라노 vs 코끼리</div>', unsafe_allow_html=True)
-
-st.components.v1.html("""
-<div style=\"display:flex; justify-content:center;\">
-<canvas id=\"playground\" width=\"650\" height=\"350\" style=\"background:#232629; border-radius:1.7em; box-shadow:0 0 32px #000a;\"></canvas>
-</div>
-<script>
-const canvas = document.getElementById('playground');
-const ctx = canvas.getContext('2d');
-
-// 공 정보
-const balls = [
-  {
-    name: '티라노',
-    img: 'https://static.turbosquid.com/Preview/001304/868/KG/Z.jpg',
-    x: 180, y: 100, r: 56,
-    vx: 0, vy: 0,
-    dragging: false, offsetX: 0, offsetY: 0,
-    mass: 8.0,
-    color: '#00ffc2'
-  },
-  {
-    name: '코끼리',
-    img: 'https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg',
-    x: 440, y: 130, r: 64,
-    vx: 0, vy: 0,
-    dragging: false, offsetX: 0, offsetY: 0,
-    mass: 7.5,
-    color: '#e1e100'
-  }
-];
-
-// 이미지 로딩
-for (const b of balls) {
-  const image = new window.Image();
-  image.src = b.img;
-  b._img = image;
-}
-
-const g = 0.25; // 달 중력 (지구 1/4)
-const friction = 0.99;
-const bounce = 0.82;
-
-// 드래그 변수
-let dragIdx = null;
-
-canvas.addEventListener('mousedown', function(e) {
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-  for (let i=balls.length-1; i>=0; i--) { // 위에 떠 있는 게 먼저 잡힘
-    const b = balls[i];
-    const dist = Math.hypot(mx-b.x, my-b.y);
-    if (dist < b.r) {
-      dragIdx = i;
-      b.dragging = true;
-      b.offsetX = mx - b.x;
-      b.offsetY = my - b.y;
-      b.vx = 0; b.vy = 0;
-      break;
-    }
-  }
-});
-canvas.addEventListener('mousemove', function(e) {
-  if (dragIdx !== null) {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    const b = balls[dragIdx];
-    b.x = mx - b.offsetX;
-    b.y = my - b.offsetY;
-  }
-});
-canvas.addEventListener('mouseup', function(e) {
-  if (dragIdx !== null) {
-    balls[dragIdx].dragging = false;
-    dragIdx = null;
-  }
-});
-canvas.addEventListener('mouseleave', function(e) {
-  if (dragIdx !== null) {
-    balls[dragIdx].dragging = false;
-    dragIdx = null;
-  }
-});
-
-function update() {
-  for (const b of balls) {
-    if (!b.dragging) {
-      b.vy += g;
-      b.x += b.vx;
-      b.y += b.vy;
-      b.vx *= friction;
-      b.vy *= friction;
-      // 바닥, 천장, 벽 튕김
-      if (b.x-b.r < 0) { b.x = b.r; b.vx *= -bounce; }
-      if (b.x+b.r > canvas.width) { b.x = canvas.width-b.r; b.vx *= -bounce; }
-      if (b.y-b.r < 0) { b.y = b.r; b.vy *= -bounce; }
-      if (b.y+b.r > canvas.height) { b.y = canvas.height-b.r; b.vy *= -bounce; }
-    }
-  }
-  // 충돌 (반발력)
-  for (let i=0; i<balls.length; i++) {
-    for (let j=i+1; j<balls.length; j++) {
-      const a = balls[i], b = balls[j];
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const dist = Math.hypot(dx,dy);
-      if (dist < a.r + b.r) {
-        // 간단 반발력
-        const angle = Math.atan2(dy, dx);
-        const overlap = a.r + b.r - dist;
-        const totalMass = a.mass + b.mass;
-        a.x -= Math.cos(angle) * overlap * (b.mass/totalMass);
-        a.y -= Math.sin(angle) * overlap * (b.mass/totalMass);
-        b.x += Math.cos(angle) * overlap * (a.mass/totalMass);
-        b.y += Math.sin(angle) * overlap * (a.mass/totalMass);
-
-        // 반사 속도
-        const nx = dx/dist, ny = dy/dist;
-        const p = 2 * (a.vx*nx + a.vy*ny - b.vx*nx - b.vy*ny) / (a.mass + b.mass);
-        a.vx = (a.vx - p*b.mass*nx) * bounce;
-        a.vy = (a.vy - p*b.mass*ny) * bounce;
-        b.vx = (b.vx + p*a.mass*nx) * bounce;
-        b.vy = (b.vy + p*a.mass*ny) * bounce;
-      }
-    }
-  }
-}
-
-function drawBall(b) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(b.x, b.y, b.r, 0, 2*Math.PI, false);
-  ctx.closePath();
-  // glow effect
-  ctx.shadowColor = b.color;
-  ctx.shadowBlur = 36;
-  ctx.clip();
-
-  // 원형 이미지
-  ctx.drawImage(b._img, b.x-b.r, b.y-b.r, b.r*2, b.r*2);
-
-  ctx.shadowBlur = 0;
-  ctx.restore();
-
-  // 테두리
-  ctx.beginPath();
-  ctx.arc(b.x, b.y, b.r, 0, 2*Math.PI, false);
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.8;
-  ctx.stroke();
-  ctx.globalAlpha = 1.0;
-}
-
-function animate() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  update();
-  for (const b of balls) drawBall(b);
-  // 라벨
-  ctx.font = "bold 1.15em sans-serif";
-  ctx.textAlign = "center";
-  ctx.shadowColor = "#222";
-  ctx.shadowBlur = 18;
-  for (const b of balls) {
-    ctx.fillStyle = "#fff";
-    ctx.fillText(b.name, b.x, b.y+b.r+22);
-  }
-  ctx.shadowBlur = 0;
-  requestAnimationFrame(animate);
-}
-animate();
-</script>
-""", height=420)
-
-# --- 코끼리 vs 티라노 ---
+# --- 코끼리 vs 티라노 설명/이미지 카드 ---
 st.markdown(f"""
     <div class="vs-card">
         <div class="vs-title">🐘 코끼리 vs 티라노사우르스 🦖</div>
