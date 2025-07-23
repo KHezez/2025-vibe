@@ -117,6 +117,11 @@ dino_data = [
         "img": "https://png.pngtree.com/thumb_back/fw800/background/20230612/pngtree-3d-animation-of-an-extinct-dinosaur-image_2920885.jpg",
         "desc": "안킬로사우루스(Ankylosaurus)는 전신이 갑옷처럼 덮여 있고, 꼬리에는 곤봉이 달린 방어의 대명사. 천적도 함부로 건드리지 못했던 강인한 초식공룡."
     },
+    {
+        "name": "트리케라톱스",
+        "img": "https://png.pngtree.com/thumb_back/fw800/background/20240410/pngtree-dinosaur-triceratops-in-the-dark-image_15652694.jpg",
+        "desc": "공룡시대의 코뿔소. 티라노사우르스나 알로사우르스도 함부로 덤비기를 꺼려했던 파키케팔로사우르스의 상위호환급 전투력을 지닌 <피식자> 이다."
+    },
 ]
 
 st.markdown('<div style="text-align:center; font-size:3em; font-weight:bold; margin-bottom:0.7em; color:#fff; text-shadow:0 0 20px #00fff9, 0 0 60px #fff3;">🦖 공룡 사전</div>', unsafe_allow_html=True)
