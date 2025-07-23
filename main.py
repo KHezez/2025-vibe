@@ -107,7 +107,7 @@ st.components.v1.html("""
 <canvas id='gravity-overlay' width='1280' height='720'></canvas>
 <script>
 // 오버레이 사이즈 동기화
-def resizeOverlay() {
+function resizeOverlay() {
   const canvas = document.getElementById('gravity-overlay');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
