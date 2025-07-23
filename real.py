@@ -1,16 +1,27 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("볼풀: 공끼리 충돌 (by fury X monday)")
+st.title("볼풀: 공 추가/삭제 + 랜덤 컬러 (by fury X monday)")
 
-# 무중력 버튼 토글 변수
 if "nogravity" not in st.session_state:
     st.session_state.nogravity = False
+if "balls_n" not in st.session_state:
+    st.session_state.balls_n = 10  # 시작 공 개수
 
-if st.button("무중력 ON/OFF"):
-    st.session_state.nogravity = not st.session_state.nogravity
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("공 추가 (+1)"):
+        st.session_state.balls_n += 1
+with col2:
+    if st.button("공 삭제 (-1)", disabled=(st.session_state.balls_n<=1)):
+        if st.session_state.balls_n > 1:
+            st.session_state.balls_n -= 1
+with col3:
+    if st.button("무중력 ON/OFF"):
+        st.session_state.nogravity = not st.session_state.nogravity
 
 nogravity = st.session_state.nogravity
+balls_n = st.session_state.balls_n
 
 html_code = f"""
 <html>
@@ -35,16 +46,26 @@ html_code = f"""
       let dragIndex = -1;
       let offsetX = 0, offsetY = 0;
 
+      function randomColor() {{
+        // 밝은 랜덤 컬러 (파스텔 계열도 가끔 섞임)
+        let r = Math.floor(120+Math.random()*135);
+        let g = Math.floor(120+Math.random()*135);
+        let b = Math.floor(120+Math.random()*135);
+        return [r,g,b,220];
+      }}
+
       function setup() {{
         let c = createCanvas(window.innerWidth, window.innerHeight);
         c.parent('canvas-container');
-        for(let i=0; i<10; i++) {{
+        for(let i=0; i<{balls_n}; i++) {{
+          let [r,g,b,a] = randomColor();
           balls.push({{
             x: random(width*0.2, width*0.8), 
             y: random(height*0.1, height*0.7), 
             vx: random(-2,2), vy: random(-2,2), 
             r: 32,
-            m: 1
+            m: 1,
+            color: [r,g,b,a]
           }});
         }}
       }}
@@ -119,7 +140,7 @@ html_code = f"""
         // 공 그리기
         for(let i=0; i<balls.length; i++) {{
           let b = balls[i];
-          fill(80, 160, 255, 220);
+          fill(b.color[0], b.color[1], b.color[2], b.color[3]);
           stroke(40,80,140,180);
           strokeWeight(3);
           ellipse(b.x, b.y, b.r*2, b.r*2);
