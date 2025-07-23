@@ -1,95 +1,83 @@
 import streamlit as st
-import openai
-from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
 
-# OpenAI API 키 설정 (자신의 키로 교체)
-openai.api_key = "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"
+# 초기값 저장용 (세션 상태)
+if 'page' not in st.session_state:
+    st.session_state.page = 'menu'
+if 'ball1' not in st.session_state:
+    st.session_state.ball1 = None
+if 'ball2' not in st.session_state:
+    st.session_state.ball2 = None
+if 'started' not in st.session_state:
+    st.session_state.started = False
 
-st.title("Image-based AI Character Chatbot")
+# 1. 메인 메뉴
+if st.session_state.page == 'menu':
+    st.title("⚪ Ball Battle Arena")
+    if st.button("1대1 배틀 시작!"):
+        st.session_state.page = 'arena'
+        # 경기장 리셋
+        st.session_state.ball1 = {
+            'pos': np.array([0.3, 0.5]),  # x, y (0~1)
+            'vel': np.array([0.01, 0.008]),
+            'color': '#FF4466'
+        }
+        st.session_state.ball2 = {
+            'pos': np.array([0.7, 0.5]),
+            'vel': np.array([-0.012, 0.007]),
+            'color': '#3377FF'
+        }
+        st.session_state.started = False
+    st.write("---")
+    st.caption("나중에 모드/설정/캐릭터 추가 가능 👾")
 
-# 1. 언어 토글
-lang = st.radio("Select Language / 언어 선택", ["English", "한국어"])
+# 2. 아레나 화면
+if st.session_state.page == 'arena':
+    st.title("⚔️ 1 vs 1 Ball Arena")
+    st.write("**SPACEBAR 없이 버튼으로만 진행**")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("← 메뉴로"):
+            st.session_state.page = 'menu'
+    with col2:
+        if st.button("Start" if not st.session_state.started else "Stop"):
+            st.session_state.started = not st.session_state.started
+    with col3:
+        if st.button("Next Step"):
+            st.session_state.started = False  # 일시정지 후 1스텝
 
-# 2. 이미지 업로더
-uploaded_file = st.file_uploader("Upload an image (이미지 업로드)", type=["jpg", "jpeg", "png"])
+    # 위치 업데이트(움직이기)
+    def update_balls():
+        for ball in [st.session_state.ball1, st.session_state.ball2]:
+            ball['pos'] += ball['vel']
+            # 벽 반사 (0~1 경계)
+            for i in range(2):
+                if ball['pos'][i] <= 0.05 or ball['pos'][i] >= 0.95:
+                    ball['vel'][i] *= -1
+                    ball['pos'][i] = np.clip(ball['pos'][i], 0.05, 0.95)
 
-# 3. Personality 입력
-personality = st.text_input('Personality (성격) 입력:', placeholder="e.g. 차가운 츤데레, wise and calm, 귀엽고 소심함...")
+    # 프레임 갱신 (실시간 대신 버튼 누를때마다)
+    if st.session_state.started or st.button("프레임 진행"):
+        update_balls()
 
-# 4. 프로필 생성 버튼
-if uploaded_file and personality and st.button("Generate Character & Start Chat / 캐릭터 생성 및 채팅 시작"):
-    image = Image.open(uploaded_file)
-    # Vision API 프롬프트: 외형+성격 반영
-    if lang == "English":
-        prompt = f"""Describe the character in this image in detail (appearance, mood, etc).
-Then, combine it with this personality: "{personality}" to create a short character profile.
-Write how this character would speak, and what their tone and quirks are.
-Output should include:
-- Character name (optional)
-- Description of appearance
-- Personality (including user input)
-- Speaking style/tone (write sample lines)
-After that, you are this character. Always respond in first-person as this character.
-Start with a short self-introduction."""
-    else:
-        prompt = f"""이 이미지를 바탕으로 캐릭터의 외형을 상세하게 설명해줘(생김새, 분위기 등).
-그리고 이 성격: "{personality}" 을(를) 반영해서 짧은 캐릭터 프로필을 만들어줘.
-이 캐릭터가 어떤 말투, 어투, 말버릇으로 말할지도 써줘(예시 대사 포함).
-아래 형식에 맞게 출력:
-- (선택) 캐릭터 이름
-- 외형 설명
-- 성격 (입력값 반영)
-- 말투/말버릇/톤 (예시 대사)
-그리고 이제부터 너는 이 캐릭터가 되어, 모든 대답을 1인칭으로 하며 사용자가 말을 걸면 그 캐릭터답게 답해.
-처음에는 자기소개로 시작해줘."""
+    # 경기장 시각화 (matplotlib)
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.set_xlim(0,1)
+    ax.set_ylim(0,1)
+    ax.set_facecolor('white')
+    ax.add_patch(plt.Rectangle((0,0),1,1, fill=False, edgecolor='black', lw=4))
 
-    # OpenAI Vision API 요청
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are an AI that creates a roleplay character and chats as them."},
-            {"role": "user", "content": prompt, "image": uploaded_file.getvalue()},
-        ],
-        max_tokens=800
-    )
+    # 공 그리기
+    for ball in [st.session_state.ball1, st.session_state.ball2]:
+        circle = plt.Circle(ball['pos'], 0.05, color=ball['color'])
+        ax.add_patch(circle)
+    ax.set_xticks([]); ax.set_yticks([])
+    st.pyplot(fig)
 
-    # 캐릭터 프로필/자기소개 출력
-    char_intro = response.choices[0].message.content
-    st.markdown("### 🤖 Character Introduction / 캐릭터 자기소개")
-    st.write(char_intro)
+    st.caption("버튼으로 프레임 갱신 (Start 누르면 자동, Next Step은 1스텝만)")
 
-    # 채팅 세션 준비 (최초 프롬프트 저장)
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-        st.session_state.char_system_prompt = char_intro
-
-# 5. 채팅 인터페이스
-if 'char_system_prompt' in st.session_state:
-    user_msg = st.text_input("You:", key="chat_input")
-    if user_msg:
-        # AI에게 이전 메시지들과 함께 전달
-        messages = [
-            {"role": "system", "content": st.session_state.char_system_prompt}
-        ]
-        for m in st.session_state.chat_history:
-            messages.append({"role": "user", "content": m["user"]})
-            messages.append({"role": "assistant", "content": m["ai"]})
-        messages.append({"role": "user", "content": user_msg})
-
-        response = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            max_tokens=300
-        )
-        ai_reply = response.choices[0].message.content
-        st.session_state.chat_history.append({"user": user_msg, "ai": ai_reply})
-        st.markdown(f"**You:** {user_msg}")
-        st.markdown(f"**AI:** {ai_reply}")
-
-    # 이전 대화 보여주기
-    if st.session_state.chat_history:
-        st.markdown("### Chat History / 대화 기록")
-        for entry in st.session_state.chat_history:
-            st.markdown(f"**You:** {entry['user']}")
-            st.markdown(f"**AI:** {entry['ai']}")
-
+    # 공 위치 정보 표시 (테스트용)
+    with st.expander("공 위치/속도 정보 보기 (테스트용)"):
+        st.write("Ball 1:", st.session_state.ball1)
+        st.write("Ball 2:", st.session_state.ball2)
