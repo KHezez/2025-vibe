@@ -1,83 +1,135 @@
 import streamlit as st
-import numpy as np
-import matplotlib.pyplot as plt
+import random
+import time
 
-# 초기값 저장용 (세션 상태)
-if 'page' not in st.session_state:
-    st.session_state.page = 'menu'
-if 'ball1' not in st.session_state:
-    st.session_state.ball1 = None
-if 'ball2' not in st.session_state:
-    st.session_state.ball2 = None
-if 'started' not in st.session_state:
-    st.session_state.started = False
+# ===== 데이터 준비 =====
+short_sentences = [
+    "The sky is blue.",
+    "I love pizza.",
+    "Type as fast as you can.",
+    "Python is fun.",
+    "This is a short test."
+]
+word_pool = [
+    "apple", "banana", "orange", "cat", "dog", "house", "river", "train", "car",
+    "mouse", "keyboard", "window", "light", "night", "happy", "sad", "smile", "fire",
+    "water", "book", "door", "game", "star", "sun", "moon", "love", "friend", "music"
+]
 
-# 1. 메인 메뉴
-if st.session_state.page == 'menu':
-    st.title("⚪ Ball Battle Arena")
-    if st.button("1대1 배틀 시작!"):
-        st.session_state.page = 'arena'
-        # 경기장 리셋
-        st.session_state.ball1 = {
-            'pos': np.array([0.3, 0.5]),  # x, y (0~1)
-            'vel': np.array([0.01, 0.008]),
-            'color': '#FF4466'
-        }
-        st.session_state.ball2 = {
-            'pos': np.array([0.7, 0.5]),
-            'vel': np.array([-0.012, 0.007]),
-            'color': '#3377FF'
-        }
-        st.session_state.started = False
-    st.write("---")
-    st.caption("나중에 모드/설정/캐릭터 추가 가능 👾")
+# ===== 세션 상태 초기화 =====
+if "start_time" not in st.session_state:
+    st.session_state.start_time = None
+if "done" not in st.session_state:
+    st.session_state.done = False
+if "target_text" not in st.session_state:
+    st.session_state.target_text = ""
+if "mode" not in st.session_state:
+    st.session_state.mode = "Short Sentence"
+if "theme" not in st.session_state:
+    st.session_state.theme = "Light"
+if "results" not in st.session_state:
+    st.session_state.results = None
 
-# 2. 아레나 화면
-if st.session_state.page == 'arena':
-    st.title("⚔️ 1 vs 1 Ball Arena")
-    st.write("**SPACEBAR 없이 버튼으로만 진행**")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("← 메뉴로"):
-            st.session_state.page = 'menu'
-    with col2:
-        if st.button("Start" if not st.session_state.started else "Stop"):
-            st.session_state.started = not st.session_state.started
-    with col3:
-        if st.button("Next Step"):
-            st.session_state.started = False  # 일시정지 후 1스텝
+# ===== 테마 설정 =====
+THEMES = {
+    "Light": {
+        "background": "#fafafa",
+        "text": "#111",
+        "input_bg": "#fff",
+        "input_text": "#111"
+    },
+    "Black": {
+        "background": "#23272f",
+        "text": "#fafafa",
+        "input_bg": "#292d36",
+        "input_text": "#fafafa"
+    }
+}
+theme = THEMES[st.session_state.theme]
 
-    # 위치 업데이트(움직이기)
-    def update_balls():
-        for ball in [st.session_state.ball1, st.session_state.ball2]:
-            ball['pos'] += ball['vel']
-            # 벽 반사 (0~1 경계)
-            for i in range(2):
-                if ball['pos'][i] <= 0.05 or ball['pos'][i] >= 0.95:
-                    ball['vel'][i] *= -1
-                    ball['pos'][i] = np.clip(ball['pos'][i], 0.05, 0.95)
+# CSS 주입
+st.markdown(
+    f"""
+    <style>
+    body {{ background: {theme['background']} !important; color: {theme['text']} !important; }}
+    .stTextInput > div > div > input {{ background-color: {theme['input_bg']} !important; color: {theme['input_text']} !important; }}
+    .stTextInput > div > div > input:focus {{ background-color: #e0e0e0 !important; }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-    # 프레임 갱신 (실시간 대신 버튼 누를때마다)
-    if st.session_state.started or st.button("프레임 진행"):
-        update_balls()
+# ===== 타이틀 & 테마 선택 =====
+st.markdown(f"<h1 style='color: {theme['text']};'>영타 연습 웹사이트</h1>", unsafe_allow_html=True)
+col1, col2 = st.columns([3, 1])
+with col2:
+    new_theme = st.radio("테마 선택", ("Light", "Black"), index=0 if st.session_state.theme=="Light" else 1)
+    if new_theme != st.session_state.theme:
+        st.session_state.theme = new_theme
+        st.experimental_rerun()
 
-    # 경기장 시각화 (matplotlib)
-    fig, ax = plt.subplots(figsize=(5,5))
-    ax.set_xlim(0,1)
-    ax.set_ylim(0,1)
-    ax.set_facecolor('white')
-    ax.add_patch(plt.Rectangle((0,0),1,1, fill=False, edgecolor='black', lw=4))
+# ===== 모드 선택 =====
+mode = st.radio("모드 선택", ["Short Sentence", "Word", "15 Word Challenge"], index=["Short Sentence", "Word", "15 Word Challenge"].index(st.session_state.mode))
+if mode != st.session_state.mode:
+    st.session_state.mode = mode
+    st.session_state.start_time = None
+    st.session_state.done = False
+    st.session_state.results = None
+    st.session_state.target_text = ""
 
-    # 공 그리기
-    for ball in [st.session_state.ball1, st.session_state.ball2]:
-        circle = plt.Circle(ball['pos'], 0.05, color=ball['color'])
-        ax.add_patch(circle)
-    ax.set_xticks([]); ax.set_yticks([])
-    st.pyplot(fig)
+# ===== 타겟 텍스트 생성 =====
+if not st.session_state.target_text or st.button("새로고침"):
+    if st.session_state.mode == "Short Sentence":
+        st.session_state.target_text = random.choice(short_sentences)
+    elif st.session_state.mode == "Word":
+        st.session_state.target_text = random.choice(word_pool)
+    elif st.session_state.mode == "15 Word Challenge":
+        st.session_state.target_text = " ".join(random.sample(word_pool, 15))
+    st.session_state.start_time = None
+    st.session_state.done = False
+    st.session_state.results = None
 
-    st.caption("버튼으로 프레임 갱신 (Start 누르면 자동, Next Step은 1스텝만)")
+# ===== 타이핑 입력 =====
+st.markdown(f"<p style='color: {theme['text']}; font-size:1.2em;'><b>아래 텍스트를 입력하세요:</b></p>", unsafe_allow_html=True)
+st.code(st.session_state.target_text, language="markdown")
 
-    # 공 위치 정보 표시 (테스트용)
-    with st.expander("공 위치/속도 정보 보기 (테스트용)"):
-        st.write("Ball 1:", st.session_state.ball1)
-        st.write("Ball 2:", st.session_state.ball2)
+input_key = "typing_input"
+if st.session_state.done:
+    user_input = ""
+else:
+    user_input = st.text_input("여기에 입력:", key=input_key, value="", disabled=st.session_state.done)
+
+# ===== 타이머 및 결과 =====
+if not st.session_state.done and user_input and st.session_state.start_time is None:
+    st.session_state.start_time = time.time()
+
+if not st.session_state.done and user_input == st.session_state.target_text:
+    elapsed = time.time() - st.session_state.start_time
+    char_count = len(st.session_state.target_text)
+    word_count = len(st.session_state.target_text.split())
+    wpm = (char_count/5) / (elapsed/60)
+    accuracy = 100  # 정답만 체크
+    st.session_state.done = True
+    st.session_state.results = {
+        "elapsed": elapsed,
+        "wpm": wpm,
+        "word_count": word_count,
+        "char_count": char_count
+    }
+    st.success(f"🎉 완료! 시간: {elapsed:.2f}초 | WPM: {wpm:.2f} | 단어 수: {word_count}")
+    st.balloons()
+elif user_input and not st.session_state.done:
+    # 실시간 오타 체크
+    correct_chars = sum(1 for a, b in zip(user_input, st.session_state.target_text) if a == b)
+    accuracy = correct_chars / len(st.session_state.target_text) * 100
+    st.info(f"실시간 정확도: {accuracy:.2f}%")
+
+if st.session_state.results:
+    st.markdown("---")
+    st.write("**결과 요약**")
+    st.write(f"- 소요 시간: {st.session_state.results['elapsed']:.2f}초")
+    st.write(f"- WPM: {st.session_state.results['wpm']:.2f}")
+    st.write(f"- 단어 수: {st.session_state.results['word_count']}개")
+    st.write(f"- 문자 수: {st.session_state.results['char_count']}자")
+
+st.caption("mini monkeytype powered by Fury & monday")
