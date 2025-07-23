@@ -83,8 +83,8 @@ st.markdown("""
     }
     /* 싸움존 */
     #fight-zone {
-        width: 500px;
-        height: 500px;
+        width: 320px;
+        height: 160px;
         border: 3px solid #fff;
         border-radius: 1em;
         margin: 0 auto 60px auto;
@@ -162,7 +162,7 @@ st.markdown("""
 
 st.components.v1.html("""
 <div id='fight-zone'>
-  <canvas id='fight-canvas' width='500' height='500'></canvas>
+  <canvas id='fight-canvas' width='320' height='160'></canvas>
 </div>
 <script>
 // 캔버스 사이즈 자동 맞춤 (필요시)
