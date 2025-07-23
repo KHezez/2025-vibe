@@ -1,62 +1,15 @@
 import streamlit as st
 
-# --- 페이지 기본 스타일 ---
+# ----- 기존 공룡 카드 (위에 있는 코드) -----
 st.markdown("""
     <style>
-    body, .stApp {
-        background-color: #111 !important;
-        color: #fff !important;
-    }
-    .dino-card {
-        display: flex;
-        align-items: center;
-        background: rgba(20,20,20,0.98);
-        border-radius: 1.5em;
-        margin-bottom: 2.5em;
-        box-shadow: 0 4px 24px #0008;
-        transition: box-shadow 0.3s;
-        padding: 2em 1em;
-        opacity: 0;
-        animation: fadeInUp 1.2s ease-out forwards;
-    }
-    .dino-img {
-        width: 260px;
-        height: 160px;
-        object-fit: cover;
-        border-radius: 1em;
-        box-shadow: 0 0 32px #7ef9ff22;
-        margin-right: 2em;
-        transition: transform 0.35s cubic-bezier(.33,2,.22,.8), box-shadow 0.3s;
-        cursor: pointer;
-    }
-    .dino-img:hover {
-        transform: scale(1.13) rotate(-2deg);
-        box-shadow: 0 0 64px #00fff9cc, 0 0 32px #fffb;
-        z-index: 2;
-    }
-    .dino-title {
-        font-size: 2.1em;
-        font-weight: bold;
-        margin-bottom: 0.6em;
-        color: #fff;
-        text-shadow: 0 0 16px #fff7, 0 0 24px #00fff933;
-        letter-spacing: 1.5px;
-    }
-    .dino-desc {
-        font-size: 1.12em;
-        color: #fff;
-        text-shadow: 0 0 7px #00fff944;
-    }
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(80px) scale(0.97);
-        }
-        to {
-            opacity: 1;
-            transform: none;
-        }
-    }
+    body, .stApp { background-color: #111 !important; color: #fff !important; }
+    .dino-card { display: flex; align-items: center; background: rgba(20,20,20,0.98); border-radius: 1.5em; margin-bottom: 2.5em; box-shadow: 0 4px 24px #0008; transition: box-shadow 0.3s; padding: 2em 1em; opacity: 0; animation: fadeInUp 1.2s ease-out forwards;}
+    .dino-img { width: 260px; height: 160px; object-fit: cover; border-radius: 1em; box-shadow: 0 0 32px #7ef9ff22; margin-right: 2em; transition: transform 0.35s cubic-bezier(.33,2,.22,.8), box-shadow 0.3s; cursor: pointer;}
+    .dino-img:hover { transform: scale(1.13) rotate(-2deg); box-shadow: 0 0 64px #00fff9cc, 0 0 32px #fffb; z-index: 2;}
+    .dino-title { font-size: 2.1em; font-weight: bold; margin-bottom: 0.6em; color: #fff; text-shadow: 0 0 16px #fff7, 0 0 24px #00fff933; letter-spacing: 1.5px;}
+    .dino-desc { font-size: 1.12em; color: #fff; text-shadow: 0 0 7px #00fff944;}
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(80px) scale(0.97);} to { opacity: 1; transform: none;}}
     </style>
 """, unsafe_allow_html=True)
 
@@ -86,7 +39,6 @@ dino_data = [
 st.markdown('<div style="text-align:center; font-size:3em; font-weight:bold; margin-bottom:0.7em; color:#fff; text-shadow:0 0 20px #00fff9, 0 0 60px #fff3;">🦖 공룡 사전</div>', unsafe_allow_html=True)
 
 for idx, dino in enumerate(dino_data):
-    # 각 카드에 순차적 fade-in 딜레이를 주고싶으면 animation-delay 추가 가능
     st.markdown(f"""
         <div class="dino-card" style="animation-delay: {idx * 0.3}s">
             <img src="{dino['img']}" class="dino-img" alt="{dino['name']}"/>
@@ -97,4 +49,119 @@ for idx, dino in enumerate(dino_data):
         </div>
     """, unsafe_allow_html=True)
 
+# ----- 코끼리 vs 티라노 카드 -----
+st.markdown("""
+    <style>
+    .battle-card {
+        background: linear-gradient(120deg, #1b232a 60%, #2c1e19 100%);
+        border-radius: 2em;
+        margin: 30px 0 50px 0;
+        box-shadow: 0 0 36px #001f3f33;
+        padding: 2.5em 1.5em 2em 1.5em;
+        color: #fff;
+        position: relative;
+        overflow: visible;
+        animation: fadeInUp 1.5s 1s cubic-bezier(.23,1.3,.44,1) both;
+    }
+    .battle-title {
+        font-size: 2.5em;
+        font-weight: bold;
+        margin-bottom: 0.5em;
+        color: #ffee75;
+        text-shadow: 0 0 16px #fff6, 0 0 36px #ff8;
+        text-align: center;
+        letter-spacing: 2px;
+    }
+    .battle-desc {
+        font-size: 1.17em;
+        color: #fff;
+        margin-bottom: 1.4em;
+        text-shadow: 0 0 10px #cfd9f1cc;
+        text-align: center;
+    }
+    .ele-img-wrap {
+        display: flex; justify-content: center; align-items: center; margin-bottom: 0.7em;
+    }
+    .ele-img {
+        width: 320px; height: 210px; object-fit: cover; border-radius: 1.5em;
+        box-shadow: 0 0 48px #ffe47822;
+        margin: 0 10px;
+        cursor: pointer;
+        transition: transform 0.35s cubic-bezier(.33,2,.22,.8), box-shadow 0.3s;
+    }
+    .ele-img:hover { transform: scale(1.12) rotate(3deg); box-shadow: 0 0 64px #ffee75cc, 0 0 32px #fff8; z-index:2;}
+    /* 똥 투척용 애니메이션 준비 */
+    .poop-img {
+        position: fixed;
+        left: 50%; top: 49%;
+        width: 90px; z-index: 1002;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+        transition: opacity 0.5s, transform 1s cubic-bezier(.28,2,.65,.9);
+    }
+    .poop-fly {
+        opacity: 1 !important;
+        animation: poopFly 1.1s cubic-bezier(.45,1.7,.58,.8) forwards;
+    }
+    @keyframes poopFly {
+        0%   { opacity:1; transform: translate(-50%,-50%) scale(0.3) rotate(0deg);}
+        60%  { opacity:1; }
+        85%  { opacity:1; }
+        100% { opacity:0; 
+            transform: translate(220px,160px) scale(0.9) rotate(370deg);}
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# battle 설명
+st.markdown(f"""
+    <div class="battle-card">
+        <div class="battle-title">🐘 코끼리 vs 티라노 🦖</div>
+        <div class="battle-desc">
+            실제 연구 결과, <b>코끼리와 티라노사우루스의 체급</b>은 거의 비슷하다.<br>
+            둘 다 5~7톤급으로, <b>50:50</b> 승부.<br>
+            <span style="color:#ffee75; font-weight:600; text-shadow: 0 0 14px #fffa;">
+            결국 먼저 때리는 쪽이 이기는 결말!</span>
+        </div>
+        <div class="ele-img-wrap">
+            <img src="https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg"
+                 id="ele-img"
+                 class="ele-img"
+                 title="클릭하면… 코끼리 변신!"/>
+        </div>
+    </div>
+    <img src="https://img.freepik.com/premium-vector/cute-smiling-poop-character-happy-poo-emoji-isolated-on-white-background-vector-illustration_107547-1254.jpg?w=740"
+         id="poop-img"
+         class="poop-img"
+    />
+""", unsafe_allow_html=True)
+
+# --- JS: 클릭 시 이미지 바뀌고, 똥 애니메이션 ---
+
+st.markdown("""
+    <script>
+    let eleImg = window.parent.document.getElementById("ele-img");
+    let poop = window.parent.document.getElementById("poop-img");
+    if(eleImg && poop) {
+        eleImg.onclick = function(){
+            // 1. 코끼리2로 바꿈
+            let orig = "https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg";
+            let rear = "https://c.pxhere.com/images/1a/37/e8e2a84f85469d24299d6f795fae-1422613.jpg!d";
+            eleImg.src = rear;
+            // 2. 똥 날리기
+            poop.classList.add('poop-fly');
+            setTimeout(()=>{
+                poop.classList.remove('poop-fly');
+            }, 1100);
+            // 3. 다시 앞으로 (0.3초)
+            setTimeout(()=>{
+                eleImg.src = orig;
+            }, 300);
+        }
+    }
+    </script>
+""", unsafe_allow_html=True)
+
+# ----- 제작자 표기 -----
 st.markdown('<div style="text-align:center; opacity:0.7; margin-top:2em; font-size:1.2em;">by monday ✨</div>', unsafe_allow_html=True)
