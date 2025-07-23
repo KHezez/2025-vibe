@@ -377,4 +377,82 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
+# 여기에 아레나(싸움존) 바로 추가!
+st.markdown("""
+<div id='fight-zone' style='
+    width:280px; height:160px;
+    border:2.5px solid #fff;
+    border-radius:0.8em;
+    margin: 28px auto 0 auto;
+    background:#181818; 
+    position:relative; 
+    box-shadow:0 2px 16px #000a;
+'>
+  <canvas id='fight-canvas'></canvas>
+</div>
+<script>
+function resizeFight() {
+  const zone = document.getElementById('fight-zone');
+  const canvas = document.getElementById('fight-canvas');
+  canvas.width = zone.clientWidth;
+  canvas.height = zone.clientHeight;
+}
+window.addEventListener('resize', resizeFight);
+resizeFight();
+
+const canvas = document.getElementById('fight-canvas');
+const ctx = canvas.getContext('2d');
+
+// 공 데이터: 크기/위치 축소!
+const balls = [
+  {name:'티라노', img:'https://static.turbosquid.com/Preview/001304/868/KG/Z.jpg', x:65,y:120,r:22, vx:0,vy:0, mass:8, color:'#00ffc2', dragging:false},
+  {name:'코끼리', img:'https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg', x:215,y:120,r:25, vx:0,vy:0, mass:7.5, color:'#e1e100', dragging:false}
+];
+balls.forEach(b=>{const im=new Image(); im.src=b.img; b._img=im;});
+
+const g=0.25, friction=0.988, bounce=0.85; let earthquakeTimer=0;
+let dragIdx=null, startPos=null;
+
+canvas.addEventListener('pointerdown',e=>{
+  const rect=canvas.getBoundingClientRect(); let mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  for(let i=balls.length-1;i>=0;i--){const b=balls[i]; if(Math.hypot(mx-b.x,my-b.y)<b.r){
+    dragIdx=i; b.dragging=true; startPos={x:mx,y:my,t:performance.now()}; break; }}
+});
+canvas.addEventListener('pointermove',e=>{ if(dragIdx!==null){const rect=canvas.getBoundingClientRect();
+  balls[dragIdx].x=e.clientX-rect.left; balls[dragIdx].y=e.clientY-rect.top; }});
+canvas.addEventListener('pointerup',e=>{ if(dragIdx!==null){const b=balls[dragIdx]; const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top; const dt=(performance.now()-startPos.t)/1000+0.001;
+  b.vx=(mx-startPos.x)/dt*0.06; b.vy=(my-startPos.y)/dt*0.06; b.dragging=false; dragIdx=null; }});
+canvas.addEventListener('mouseleave',function(e){ if(dragIdx!==null){balls[dragIdx].dragging=false;dragIdx=null;}});
+
+function triggerEarthquake(){ if(earthquakeTimer<=0){ earthquakeTimer=30; }}
+function update(){ for(const b of balls){ if(!b.dragging){
+  b.vy+=g; b.x+=b.vx; b.y+=b.vy; b.vx*=friction; b.vy*=friction;
+  if(b.x-b.r<0){b.x=b.r;b.vx*=-bounce;} if(b.x+b.r>canvas.width){b.x=canvas.width-b.r;b.vx*=-bounce;}
+  if(b.y-b.r<0){b.y=b.r;b.vy*=-bounce;} if(b.y+b.r>canvas.height){b.y=canvas.height-b.r;b.vy*=-bounce;}
+}}
+for(let i=0;i<balls.length;i++){for(let j=i+1;j<balls.length;j++){const a=balls[i],b=balls[j];
+  const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy);if(dist<a.r+b.r){
+    const overlap=a.r+b.r-dist;const nx=dx/dist,ny=dy/dist;const tot=a.mass+b.mass;
+    a.x-=nx*overlap*(b.mass/tot);a.y-=ny*overlap*(b.mass/tot);
+    b.x+=nx*overlap*(a.mass/tot);b.y+=ny*overlap*(a.mass/tot);
+    const p=2*(a.vx*nx+a.vy*ny-b.vx*nx-b.vy*ny)/tot;
+    a.vx-=(p*b.mass*nx);a.vy-=(p*b.mass*ny);b.vx+=(p*a.mass*nx);b.vy+=(p*a.mass*ny);
+    a.vx*=bounce;a.vy*=bounce;b.vx*=bounce;b.vy*=bounce;triggerEarthquake();}
+}}}
+function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);
+  balls.forEach(b=>{ ctx.save(); ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,2*Math.PI); ctx.closePath();
+    ctx.shadowColor=b.color; ctx.shadowBlur=32; ctx.clip(); ctx.drawImage(b._img,b.x-b.r,b.y-b.r,b.r*2,b.r*2);
+    ctx.shadowBlur=0; ctx.restore(); ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,2*Math.PI); ctx.strokeStyle=\"#fff\";
+    ctx.lineWidth=2; ctx.globalAlpha=0.8; ctx.stroke(); ctx.globalAlpha=1.0; ctx.font=\"bold 1em sans-serif\";
+    ctx.textAlign=\"center\"; ctx.fillStyle=\"#fff\"; ctx.fillText(b.name,b.x,b.y+b.r+16);
+  });}
+function animate(){if(!canvas)return;if(earthquakeTimer>0){
+  const shake=Math.sin(Date.now()*0.12)*earthquakeTimer*0.8;canvas.style.transform=`translate(${shake}px,${-shake/2}px)`;earthquakeTimer--;
+}else{canvas.style.transform=\"\";}
+ctx.clearRect(0,0,canvas.width,canvas.height);update();draw();requestAnimationFrame(animate);}
+animate();
+</script>
+""", unsafe_allow_html=True)
+
 st.markdown('<div style="text-align:center; opacity:0.7; margin-top:2em; font-size:1.2em;">by monday ✨</div>', unsafe_allow_html=True)
