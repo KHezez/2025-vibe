@@ -162,7 +162,7 @@ st.markdown("""
 
 st.components.v1.html("""
 <div id='fight-zone'>
-  <canvas id='fight-canvas' width='320' height='160'></canvas>
+  <canvas id='fight-canvas' width='820' height='360'></canvas>
 </div>
 <script>
 // 캔버스 사이즈 자동 맞춤 (필요시)
