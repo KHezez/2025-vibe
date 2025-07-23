@@ -170,7 +170,7 @@ st.markdown(f"""
 st.markdown("""
 <div style='text-align:center; margin-top:1.5em; margin-bottom:0.5em;'>
   <div style='font-size:1.3em; font-weight:bold; color:#fff; text-shadow:0 0 12px #00fff9;'>
-    🦖🐘 코끼리 vs 티라노 싸움존 🥊
+    🦖🐘 코끼리 vs 티라노 싸움존 🥊 (마우스로 드래그)
   </div>
 </div>
 """, unsafe_allow_html=True)
