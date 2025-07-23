@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("볼풀: 보스 등장! (by fury X monday)")
+st.title("볼풀: 보스 강점 판정 FIX! (by fury X monday)")
 
 if "nogravity" not in st.session_state:
     st.session_state.nogravity = False
@@ -122,7 +122,6 @@ html_code = f"""
       }}
 
       function addBoss() {{
-        // 보스는 r=54, m=8, hp=20, 중앙고정, 전체 빨강(강점), stun=true면 전체 파랑(약점)
         balls.push({{
             x: width*0.5, 
             y: height*0.4, 
@@ -169,7 +168,7 @@ html_code = f"""
                 addBall();
             }}
         }}
-        // 보스 삭제(플래그 off되면)
+        // 보스 삭제
         if (!{str(boss).lower()}) {{
             for(let i=balls.length-1; i>=0; i--) {{
                 if(balls[i].isBoss) balls.splice(i,1);
@@ -184,17 +183,13 @@ html_code = f"""
         for(let i=0; i<balls.length; i++) {{
           let b = balls[i];
           if (!b.alive) continue;
-
-          // 보스 스턴 타임 체크
           if (b.isBoss) {{
               if(b.stun && now - b.stunStart > BOSS_STUN_TIME) {{
                   b.stun = false;
                   boss_stun = false;
               }}
           }}
-
-          // 무게별 반영
-          let m_fac = (b.isBoss?0.3:1.0); // 보스는 덜 밀림
+          let m_fac = (b.isBoss?0.3:1.0);
           if (!dragging || dragIndex !== i) {{
             b.vy += gravity * 0.25 * m_fac;
             b.x += b.vx;
@@ -235,7 +230,6 @@ html_code = f"""
             if (dist2 < minDist*minDist) {{
               let dist = sqrt(dist2) || 0.01;
               let overlap = 0.5 * (dist - minDist);
-              // 무게비 반영
               let m1 = b1.isBoss ? 8 : 1;
               let m2 = b2.isBoss ? 8 : 1;
               b1.x += overlap * dx / dist * (m2/(m1+m2));
@@ -262,27 +256,22 @@ html_code = f"""
 
               if ({str(fight_mode).lower()}) {{
                 let now = millis();
-                // 일반공 약점(0~0.8*2PI), 강점(0.8*2PI~2PI)
-                // 보스 평소: 전체 강점(빨강), stun: 전체 약점(파랑)
-                let b1atk = !b1.isBoss && (b1.angle !== undefined);
-                let b2atk = !b2.isBoss && (b2.angle !== undefined);
-
+                // angle 기준점(충돌각, 각각의 공 기준)
                 let angle12 = atan2(b2.y-b1.y, b2.x-b1.x) - b1.angle;
                 if(angle12 < 0) angle12 += TWO_PI;
                 if(angle12 > TWO_PI) angle12 -= TWO_PI;
-
                 let angle21 = atan2(b1.y-b2.y, b1.x-b2.x) - b2.angle;
                 if(angle21 < 0) angle21 += TWO_PI;
                 if(angle21 > TWO_PI) angle21 -= TWO_PI;
 
-                // === 일반공-일반공 ===
+                // === (1) 일반공 vs 일반공 ===
                 if (!b1.isBoss && !b2.isBoss) {{
                     let atk1 = (angle12 > 0.8*2*PI && angle12 <= 2*PI);
                     let weak2 = (angle21 >= 0 && angle21 < 0.8*2*PI && !b2.stun);
                     let atk2 = (angle21 > 0.8*2*PI && angle21 <= 2*PI);
                     let weak1 = (angle12 >= 0 && angle12 < 0.8*2*PI && !b1.stun);
 
-                    // 정상 데미지
+                    // 강점→약점 (일반공)
                     if (atk1 && weak2) {{
                         if (now - b2.last_hit > {int(0.5*1000)}) {{
                             b2.hp -= 1;
@@ -315,18 +304,35 @@ html_code = f"""
                     }}
                 }}
 
-                // === 일반공-보스 ===
-                if (b1.isBoss != b2.isBoss) {{
-                    let boss = b1.isBoss ? b1 : b2;
-                    let normal = b1.isBoss ? b2 : b1;
-                    let boss_angle = b1.isBoss ? angle21 : angle12;
-                    let norm_angle = b1.isBoss ? angle12 : angle21;
+                // === (2) "보스 vs 일반공" (공격/수비 모두!)
+                // (a) 보스가 일반공 약점 때림 (보스는 항상 전체 강점, 일반공 약점만 각도 판정)
+                if (b1.isBoss && !b2.isBoss && !b2.stun) {{
+                    let weak2 = (angle21 >= 0 && angle21 < 0.8*2*PI);
+                    if (weak2 && (now - b2.last_hit > {int(0.5*1000)})) {{
+                        b2.hp -= 1;
+                        b2.last_hit = now;
+                        b2.av += random(-0.25,0.25);
+                        if (hitLoaded) hitSound.play();
+                    }}
+                }}
+                if (!b1.isBoss && b2.isBoss && !b1.stun) {{
+                    let weak1 = (angle12 >= 0 && angle12 < 0.8*2*PI);
+                    if (weak1 && (now - b1.last_hit > {int(0.5*1000)})) {{
+                        b1.hp -= 1;
+                        b1.last_hit = now;
+                        b1.av += random(-0.25,0.25);
+                        if (hitLoaded) hitSound.play();
+                    }}
+                }}
 
-                    // 보스 평소: 전체 강점
-                    // 일반공 강점 (0.8*2PI~2PI)
+                // (b) 강점끼리 폭발+보스 스턴
+                if ( (b1.isBoss && !b2.isBoss) || (!b1.isBoss && b2.isBoss)) {{
+                    // 보스/일반공 충돌각(일반공 기준 강점)
+                    let normal = b1.isBoss ? b2 : b1;
+                    let boss = b1.isBoss ? b1 : b2;
+                    let norm_angle = b1.isBoss ? angle21 : angle12;
                     let normalAttack = (norm_angle > 0.8*2*PI && norm_angle <= 2*PI);
 
-                    // === 일반공-보스 강점끼리 폭발: 보스 스턴 + 폭발+튕김 ===
                     if (!boss.stun && normalAttack) {{
                         if (explosionLoaded) {{
                             explosions.push({{
@@ -341,10 +347,9 @@ html_code = f"""
                         normal.vx *= 5; normal.vy *= 5;
                         boss.stun = true;
                         boss.stunStart = now;
-                        // 약점 전체 오픈(5초간)
                     }}
 
-                    // === 스턴 중 약점 때릴 때 데미지 & 효과음 ===
+                    // (c) 스턴 중 보스 약점 때리기
                     if (boss.stun && normalAttack) {{
                         if (now - boss.last_hit > {int(0.5*1000)}) {{
                             boss.hp -= 1;
@@ -395,7 +400,6 @@ html_code = f"""
           let invuln = (now - b.last_hit < {int(0.5*1000)});
           let alpha = invuln ? 120 : 220;
 
-          // 본체
           fill(b.color[0], b.color[1], b.color[2], alpha);
           stroke(40,80,140,180*alpha/220);
           strokeWeight(3);
@@ -405,7 +409,6 @@ html_code = f"""
           if ({str(fight_mode).lower()}) {{
             noStroke();
             if (b.isBoss) {{
-                // 평소: 전체 빨강(강점), stun중: 전체 파랑(약점)
                 if (b.stun) {{
                     fill(40,80,255,alpha);
                 }} else {{
@@ -413,7 +416,6 @@ html_code = f"""
                 }}
                 arc(0,0,b.r*2,b.r*2,0,2*PI,PIE);
             }} else {{
-                // 일반공: 약점(80%), 강점(20%)
                 fill(40,80,255,alpha);
                 arc(0,0,b.r*2,b.r*2,0,0.8*2*PI,PIE);
                 fill(255,80,80,alpha);
@@ -421,7 +423,6 @@ html_code = f"""
             }}
           }}
 
-          // 중앙 HP
           fill(32,32,32,240);
           noStroke();
           textAlign(CENTER, CENTER);
