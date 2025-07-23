@@ -403,7 +403,6 @@ resizeFight();
 const canvas = document.getElementById('fight-canvas');
 const ctx = canvas.getContext('2d');
 
-// 공 데이터: 크기/위치 축소!
 const balls = [
   {name:'티라노', img:'https://static.turbosquid.com/Preview/001304/868/KG/Z.jpg', x:65,y:120,r:22, vx:0,vy:0, mass:8, color:'#00ffc2', dragging:false},
   {name:'코끼리', img:'https://images.freeimages.com/images/large-previews/f73/african-elephant-1335138.jpg', x:215,y:120,r:25, vx:0,vy:0, mass:7.5, color:'#e1e100', dragging:false}
